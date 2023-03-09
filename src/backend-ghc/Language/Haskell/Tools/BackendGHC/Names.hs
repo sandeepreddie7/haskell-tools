@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds, LiberalTypeSynonyms #-}
 
 -- | Functions that convert the basic elements of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.Names where
@@ -94,7 +94,7 @@ type ConvOk n = ( XSigPat n ~ HsWildCardBndrs n (HsImplicitBndrs n (LHsType n))
                 , NameOrRdrName (IdP n) ~ IdP n
                 )
 
-class (ConvOk n, Eq n, CorrectPass n, GHCName n, FromGHCName (IdP n), HasOccName (IdP n))
+class (Eq n, CorrectPass n, GHCName n, FromGHCName (IdP n), HasOccName (IdP n))
         => TransformableName n where
   correctNameString :: IdP n -> Trf String
   transformSplice :: HsSplice GhcPs -> Trf (HsSplice n)

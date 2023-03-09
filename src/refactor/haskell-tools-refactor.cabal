@@ -48,7 +48,7 @@ library
                      , Language.Haskell.Tools.Refactor.Utils.TypeLookup
                      , Language.Haskell.Tools.Refactor.Querying
 
-  build-depends:       base                      >= 4.11 && < 4.13
+  build-depends:       base                       
                      , aeson                     >= 1.0  && < 1.5
                      , mtl                       >= 2.2  && < 2.3
                      , uniplate                  >= 1.6  && < 1.7
@@ -56,14 +56,14 @@ library
                      , containers                >= 0.5  && < 0.7
                      , directory                 >= 1.2  && < 1.4
                      , transformers              >= 0.5  && < 0.6
-                     , references                >= 0.3  && < 0.4
+                     , references                 
                      , split                     >= 0.2  && < 0.3
                      , filepath                  >= 1.4  && < 1.5
-                     , template-haskell          >= 2.13 && < 2.15
-                     , ghc                       >= 8.4  && < 8.7
-                     , Cabal                     >= 2.0  && < 2.5
+                     , template-haskell           
+                     , ghc                        
+                     , Cabal                      
                      , haskell-tools-ast         >= 1.1  && < 1.2
-                     , haskell-tools-backend-ghc >= 1.1  && < 8.7
+                     , haskell-tools-backend-ghc
                      , haskell-tools-rewrite     >= 1.1  && < 1.2
                      , haskell-tools-prettyprint >= 1.1  && < 1.2
   default-language:    Haskell2010
@@ -73,25 +73,25 @@ test-suite haskell-tools-builtin-refactorings-test
   ghc-options:         -with-rtsopts=-M2g
   hs-source-dirs:      test
   main-is:             Main.hs
-  build-depends:       base                      >= 4.11 && < 4.13
+  build-depends:       base                       
                      , tasty                     >= 0.11 && < 1.2
                      , tasty-hunit               >= 0.9  && < 0.11
                      , transformers              >= 0.5  && < 0.6
-                     , either                    >= 4.4  && < 5.1
+                     , either                    
                      , filepath                  >= 1.4  && < 1.5
                      , mtl                       >= 2.2  && < 2.3
                      , uniplate                  >= 1.6  && < 1.7
                      , containers                >= 0.5  && < 0.7
                      , directory                 >= 1.2  && < 1.4
-                     , references                >= 0.3  && < 0.4
+                     , references                 
                      , split                     >= 0.2  && < 0.3
                      , time                      >= 1.8  && < 1.9
-                     , template-haskell          >= 2.13 && < 2.15
-                     , ghc                       >= 8.4  && < 8.7
+                     , template-haskell           
+                     , ghc                        
                      , ghc-paths                 >= 0.1  && < 0.2
-                     , Cabal                     >= 2.0  && < 2.5
+                     , Cabal                      
                      , haskell-tools-ast         >= 1.1  && < 1.2
-                     , haskell-tools-backend-ghc >= 1.1  && < 8.7
+                     , haskell-tools-backend-ghc
                      , haskell-tools-rewrite     >= 1.1  && < 1.2
                      , haskell-tools-prettyprint >= 1.1  && < 1.2
                      , haskell-tools-refactor
