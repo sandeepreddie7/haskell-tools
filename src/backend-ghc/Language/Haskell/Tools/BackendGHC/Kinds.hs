@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 
 -- | Functions that convert the kind-related elements of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.Kinds where
@@ -13,11 +13,11 @@ import Data.Data
 
 import ApiAnnotation as GHC (AnnKeywordId(..))
 import FastString as GHC (unpackFS)
-import HsTypes as GHC
+import GHC.Hs.Types as GHC
 import Name as GHC (occNameString, nameOccName, isWiredInName)
 import RdrName as GHC (RdrName(..))
 import SrcLoc as GHC
-import HsExtension (GhcPass)
+import GHC.Hs.Extension
 import Outputable
 
 import Language.Haskell.Tools.AST (Ann, AnnMaybeG, Dom, RangeStage, HasNoSemanticInfo)
@@ -29,19 +29,19 @@ import {-# SOURCE #-} Language.Haskell.Tools.BackendGHC.Types (trfType')
 import Language.Haskell.Tools.BackendGHC.Utils
 
 
-trfKindSig :: (TransformName n r, Outputable (HsType n), Data (HsType n), n ~ GhcPass p) 
-           => Maybe (LHsKind n) -> Trf (AnnMaybeG AST.UKindConstraint (Dom r) RangeStage)
+trfKindSig :: (TransformName n r, Outputable (HsType (GhcPass n)), Data (HsType (GhcPass n))) 
+           => Maybe (LHsKind (GhcPass n)) -> Trf (AnnMaybeG AST.UKindConstraint (Dom (GhcPass r)) RangeStage)
 trfKindSig = trfMaybe "" "" trfKindSig'
 
-trfKindSig' :: (TransformName n r, Outputable (HsType n), Data (HsType n), n ~ GhcPass p) 
-            => Located (HsKind n) -> Trf (Ann AST.UKindConstraint (Dom r) RangeStage)
+trfKindSig' :: (TransformName n r, Outputable (HsType (GhcPass n)), Data (HsType (GhcPass n)))
+            => Located (HsKind (GhcPass n)) -> Trf (Ann AST.UKindConstraint (Dom (GhcPass r)) RangeStage)
 trfKindSig' k = annLocNoSema (combineSrcSpans (getLoc k) <$> (tokenBefore (srcSpanStart (getLoc k)) AnnDcolon))
                              (AST.UKindConstraint <$> trfLocNoSema trfKind' k)
 
-trfKind :: (TransformName n r, Outputable (HsType n), Data (HsType n), n ~ GhcPass p) => Located (HsKind n) -> Trf (Ann AST.UKind (Dom r) RangeStage)
+trfKind :: (TransformName n r, Outputable (HsType (GhcPass n)), Data (HsType (GhcPass n))) => Located (HsKind (GhcPass n)) -> Trf (Ann AST.UKind (Dom (GhcPass r)) RangeStage)
 trfKind = trfLocNoSema trfKind'
 
-trfKind' :: forall n r p . (TransformName n r, Outputable (HsType n), Data (HsType n), n ~ GhcPass p) => HsKind n -> Trf (AST.UKind (Dom r) RangeStage)
+trfKind' :: forall n r p . (TransformName n r, Outputable (HsType (GhcPass n)), Data (HsType (GhcPass n))) => HsKind (GhcPass n) -> Trf (AST.UKind (Dom (GhcPass r)) RangeStage)
 trfKind' = trfKind'' where
   trfKind'' (HsTyVar _ _ (rdrName @n . unLoc -> Exact n))
     | isWiredInName n && occNameString (nameOccName n) == "*"
@@ -61,8 +61,8 @@ trfKind' = trfKind'' where
   trfKind'' pt@(HsTyLit {}) = AST.UPromotedKind <$> annContNoSema (trfPromoted' trfKind' pt)
   trfKind'' t = AST.UTypeKind <$> annContNoSema (trfType' t)
 
-trfPromoted' :: forall n r a . (TransformName n r, HasNoSemanticInfo (Dom r) a, Outputable (HsType n), Data (HsType n))
-                  => (HsType n -> Trf (a (Dom r) RangeStage)) -> HsType n -> Trf (AST.UPromoted a (Dom r) RangeStage)
+trfPromoted' :: forall n r a . (TransformName n r, HasNoSemanticInfo (Dom (GhcPass r)) a, Outputable (HsType (GhcPass n)), Data (HsType (GhcPass n)))
+                  => (HsType (GhcPass n) -> Trf (a (Dom (GhcPass r)) RangeStage)) -> HsType (GhcPass n) -> Trf (AST.UPromoted a (Dom (GhcPass r)) RangeStage)
 trfPromoted' _ (HsTyLit _ (HsNumTy _ int)) = pure $ AST.UPromotedInt int
 trfPromoted' _ (HsTyLit _ (HsStrTy _ str)) = pure $ AST.UPromotedString (unpackFS str)
 trfPromoted' _ (HsTyVar _ _ name) = AST.UPromotedCon <$> trfName @n name

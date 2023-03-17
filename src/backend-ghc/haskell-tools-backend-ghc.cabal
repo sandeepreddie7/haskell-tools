@@ -12,7 +12,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  ghc-options: -O2
+  ghc-options: -O2 
   exposed-modules:     Language.Haskell.Tools.BackendGHC
                      , Language.Haskell.Tools.BackendGHC.Modules
                      , Language.Haskell.Tools.BackendGHC.TH

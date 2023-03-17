@@ -25,7 +25,7 @@ library
                      , ghc                       
                      , ghc-paths                 >= 0.1 && < 0.2
                      , references                >= 0.3 && < 0.4
-                     , strict                    >= 0.3 && < 0.4
+                     , strict                    
                      , haskell-tools-refactor    >= 1.1 && < 1.2
                      , haskell-tools-builtin-refactorings >= 1.1 && < 1.2
                      , haskell-tools-daemon      >= 1.1 && < 1.2
@@ -84,7 +84,7 @@ benchmark cli-benchmark
   build-depends:       base                       
                      , criterion                 >= 1.1 && < 1.6
                      , time                      >= 1.6 && < 1.9
-                     , aeson                     >= 1.0 && < 1.5
+                     , aeson                     
                      , directory                 >= 1.2 && < 1.4
                      , filepath                  >= 1.4 && < 2.0
                      , knob                      >= 0.1 && < 0.2

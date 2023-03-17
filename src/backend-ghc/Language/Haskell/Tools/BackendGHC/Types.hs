@@ -2,16 +2,16 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 
 -- | Functions that convert the type-related elements of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.Types where
 
 import ApiAnnotation as GHC (AnnKeywordId(..))
-import HsExpr (HsSplice(..))
-import HsTypes as GHC
+import GHC.Hs.Expr (HsSplice(..))
+import GHC.Hs.Types as GHC
 import SrcLoc as GHC
-import HsExtension (GhcPass)
+import GHC.Hs.Extension
 
 import Control.Applicative (Applicative(..), (<$>), Alternative(..))
 import Control.Monad.Reader.Class (asks)
@@ -28,7 +28,7 @@ import Language.Haskell.Tools.BackendGHC.Names
 import {-# SOURCE #-} Language.Haskell.Tools.BackendGHC.TH (trfSplice, trfQuasiQuotation')
 import Language.Haskell.Tools.BackendGHC.Utils
 
-trfType :: forall n r p . (TransformName n r, n ~ GhcPass p, HasCallStack) => Located (HsType n) -> Trf (Ann AST.UType (Dom r) RangeStage)
+trfType :: forall n r . (TransformName n r, HasCallStack) => Located (HsType (GhcPass n)) -> Trf (Ann AST.UType (Dom (GhcPass r)) RangeStage)
 trfType typ | RealSrcSpan loce <- getLoc typ
   = do othSplices <- asks typeSplices
        let contSplice = filter (\sp -> case getLoc sp of (RealSrcSpan spLoc) -> spLoc `containsSpan` loce; _ -> False) othSplices
@@ -37,11 +37,11 @@ trfType typ | RealSrcSpan loce <- getLoc typ
                                 in typeSpliceInserted lsp (annLocNoSema (pure l) (AST.UTySplice <$> (trfSplice =<< rdrSplice sp)))
   | otherwise = trfLocNoSema trfType' typ
 
-trfType' :: forall n r p . (TransformName n r, n ~ GhcPass p, HasCallStack) => HsType n -> Trf (AST.UType (Dom r) RangeStage)
+trfType' :: forall n r . (TransformName n r, HasCallStack) => HsType (GhcPass n) -> Trf (AST.UType (Dom (GhcPass r)) RangeStage)
 trfType' = trfType'' where
-  trfType'' :: HsType n -> Trf (AST.UType (Dom r) RangeStage)
-  trfType'' (HsForAllTy _ [] typ) = trfType' (unLoc typ)
-  trfType'' (HsForAllTy _ bndrs typ) = AST.UTyForall <$> defineTypeVars (trfBindings bndrs)
+  trfType'' :: HsType (GhcPass n) -> Trf (AST.UType (Dom (GhcPass r)) RangeStage)
+  trfType'' (HsForAllTy _ _ [] typ) = trfType' (unLoc typ)
+  trfType'' (HsForAllTy _ _ bndrs typ) = AST.UTyForall <$> defineTypeVars (trfBindings bndrs)
                                                      <*> addToScope bndrs (trfType typ)
   trfType'' (HsQualTy _ (L _ []) typ) = trfType' (unLoc typ)
   trfType'' (HsQualTy _ ctx typ) = AST.UTyCtx <$> (fromJust . (^. annMaybe) <$> trfCtx atTheStart ctx)
@@ -70,20 +70,20 @@ trfType' = trfType'' where
   trfType'' (HsSumTy _ types) = AST.UUnbSumType <$> trfAnnList " | " trfType' types
   trfType'' t = unhandledElement "type" t
 
-trfBindings :: (TransformName n r, n ~ GhcPass p, HasCallStack) => [Located (HsTyVarBndr n)] -> Trf (AnnListG AST.UTyVar (Dom r) RangeStage)
+trfBindings :: (TransformName n r, HasCallStack) => [Located (HsTyVarBndr (GhcPass n))] -> Trf (AnnListG AST.UTyVar (Dom (GhcPass r)) RangeStage)
 trfBindings [] = makeList " " atTheStart (pure [])
 trfBindings vars = trfAnnList " " trfTyVar' vars
 
-trfTyVar :: (TransformName n r, n ~ GhcPass p, HasCallStack) => Located (HsTyVarBndr n) -> Trf (Ann AST.UTyVar (Dom r) RangeStage)
+trfTyVar :: (TransformName n r, HasCallStack) => Located (HsTyVarBndr (GhcPass n)) -> Trf (Ann AST.UTyVar (Dom (GhcPass r)) RangeStage)
 trfTyVar = trfLocNoSema trfTyVar'
 
-trfTyVar' :: forall n r p . (TransformName n r, n ~ GhcPass p, HasCallStack) => HsTyVarBndr n -> Trf (AST.UTyVar (Dom r) RangeStage)
+trfTyVar' :: forall n r p . (TransformName n r, HasCallStack) => HsTyVarBndr (GhcPass n) -> Trf (AST.UTyVar (Dom (GhcPass r)) RangeStage)
 trfTyVar' (UserTyVar _ name) = AST.UTyVarDecl <$> typeVarTransform (trfName @n name)
                                               <*> (nothing " " "" atTheEnd)
 trfTyVar' (KindedTyVar _ name kind) = AST.UTyVarDecl <$> typeVarTransform (trfName @n name)
                                                      <*> trfKindSig (Just kind)
 
-trfCtx :: (TransformName n r, n ~ GhcPass p, HasCallStack) => Trf SrcLoc -> Located (HsContext n) -> Trf (AnnMaybeG AST.UContext (Dom r) RangeStage)
+trfCtx :: (TransformName n r, HasCallStack) => Trf SrcLoc -> Located (HsContext (GhcPass n)) -> Trf (AnnMaybeG AST.UContext (Dom (GhcPass r)) RangeStage)
 trfCtx sp (L _ []) = nothing " " "" sp
 trfCtx _ (L l [L _ (HsParTy _ t)])
   = makeJust <$> annLocNoSema (combineSrcSpans l <$> tokenLoc AnnDarrow)
@@ -94,10 +94,10 @@ trfCtx _ (L l [t])
 trfCtx _ (L l ctx) = makeJust <$> annLocNoSema (combineSrcSpans l <$> tokenLoc AnnDarrow)
                                                (AST.UContext <$> annLocNoSema (pure l) (AST.UTupleAssert <$> (trfAnnList ", " trfAssertion' ctx)))
 
-trfAssertion :: (TransformName n r, n ~ GhcPass p, HasCallStack) => LHsType n -> Trf (Ann AST.UAssertion (Dom r) RangeStage)
+trfAssertion :: (TransformName n r, HasCallStack) => LHsType (GhcPass n) -> Trf (Ann AST.UAssertion (Dom (GhcPass r)) RangeStage)
 trfAssertion = trfLocNoSema trfAssertion'
 
-trfAssertion' :: forall n r p . (TransformName n r, n ~ GhcPass p, HasCallStack) => HsType n -> Trf (AST.UAssertion (Dom r) RangeStage)
+trfAssertion' :: forall n r p . (TransformName n r, HasCallStack) => HsType (GhcPass n) -> Trf (AST.UAssertion (Dom (GhcPass r)) RangeStage)
 trfAssertion' (HsParTy _ t)
   = trfAssertion' (unLoc t)
 trfAssertion' (HsOpTy _ left op right)
@@ -113,7 +113,7 @@ trfAssertion' t = case base of
    t -> unhandledElement "assertion" t
   where (args, _, base) = getArgs t
 
-        getArgs :: HsType n -> ([LHsType n], Maybe SrcSpan, HsType n)
+        getArgs :: HsType (GhcPass n) -> ([LHsType (GhcPass n)], Maybe SrcSpan, HsType (GhcPass n))
         getArgs (HsAppTy _ (L l ft) at) = case getArgs ft of (args, sp, base) -> (args++[at], sp <|> Just l, base)
         getArgs t = ([], Nothing, t)
 
