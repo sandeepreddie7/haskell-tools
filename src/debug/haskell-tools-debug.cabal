@@ -33,6 +33,7 @@ library
                      , classyplate               >= 0.3 && < 0.4
                      , criterion                 >= 1.1 && < 1.6
                      , mtl                       >= 2.2 && < 2.3
+                     , ghci
   default-language:    Haskell2010
 
 executable ht-debug

@@ -3,7 +3,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, LiberalTypeSynonyms #-}
 
 -- | Collecting modules contained in a module collection (library, executable, testsuite or
 -- benchmark). Gets names, source file locations, compilation and load flags for these modules.
@@ -16,7 +16,7 @@ import Data.Function (on)
 import Data.List
 import qualified Data.Map as Map (fromList)
 import Data.Maybe (Maybe(..), maybe, catMaybes)
-import Distribution.Compiler (AbiTag(..), unknownCompilerInfo, buildCompilerId)
+import Distribution.Compiler (AbiTag(..), unknownCompilerInfo, buildCompilerId, PerCompilerFlavor(..) )
 import Distribution.ModuleName (fromString, ModuleName, components)
 import Distribution.Package (Dependency(..), PackageName(..), pkgName, unPackageName)
 import Distribution.PackageDescription
@@ -109,7 +109,7 @@ modulesFromCabalFile root cabal = (getModules . setupFlags <$> readGenericPackag
                                 (Map.fromList $ map modRecord $ getModuleNames tmc)
                                 (flagsFromBuildInfo bi)
                                 (loadFlagsFromBuildInfo bi)
-                                (map (\(Dependency pkgName _) -> LibraryMC (unPackageName pkgName)) (targetBuildDepends bi))
+                                (map (\(Dependency pkgName _ _) -> LibraryMC (unPackageName pkgName)) (targetBuildDepends bi))
                   else Nothing
           where modRecord mn = ( moduleName mn, ModuleNotLoaded NoCodeGen (needsToCompile tmc mn) )
         moduleName = concat . intersperse "." . components
@@ -185,7 +185,9 @@ getMain' :: BuildInfo -> String
 getMain' bi
   = case ls of _:e:_ -> intercalate "." $ filter (isUpper . head) $ groupBy ((==) `on` (== '.')) e
                _ -> "Main"
-  where ls = dropWhile (/= "-main-is") (concatMap snd (options bi))
+  where ls = dropWhile (/= "-main-is") (getOptions $ options bi)
+        getOptions (PerCompilerFlavor _ a) = a
+
 
 -- | Checks if the module collection created from a folder without .cabal file.
 isDirectoryMC :: ModuleCollectionId -> Bool
@@ -245,7 +247,7 @@ loadFlagsFromBuildInfo bi@BuildInfo{ cppOptions } df
 flagsFromBuildInfo :: BuildInfo -> DynFlags -> IO DynFlags
 -- the import pathes are already set globally
 flagsFromBuildInfo bi@BuildInfo{ options } df
-  = do (df',unused,warnings) <- parseDynamicFlags df (map (L noSrcSpan) $ concatMap snd options)
+  = do (df',unused,warnings) <- parseDynamicFlags df (map (L noSrcSpan) (getOptions options))
        mapM_ putStrLn (map (unLoc . warnMsg) warnings ++ map (("Flag is not used: " ++) . unLoc) unused)
        return $ (flip lang_set (toGhcLang =<< defaultLanguage bi))
          $ foldl (.) id (map (\case EnableExtension ext -> setEnabled True ext
@@ -256,6 +258,8 @@ flagsFromBuildInfo bi@BuildInfo{ options } df
   where toGhcLang Cabal.Haskell98 = Just GHC.Haskell98
         toGhcLang Cabal.Haskell2010 = Just GHC.Haskell2010
         toGhcLang _ = Nothing
+
+        getOptions (PerCompilerFlavor _ a) = a
 
         -- We don't put the default settings (ImplicitPrelude, MonomorphismRestriction) here
         -- because that overrides the opposite extensions (NoImplicitPrelude, NoMonomorphismRestriction)

@@ -50,20 +50,20 @@ demoRefactor command workingDir args moduleName =
 
     p <- parseModule ms
     let annots = pm_annotations $ p
-    liftIO $ putStrLn $ show (pm_parsed_source p)
+    -- liftIO $ putStrLn $ show (pm_parsed_source p)
     liftIO $ putStrLn "=========== tokens:"
-    liftIO $ putStrLn $ show (fst annots)
+    -- liftIO $ putStrLn $ show (fst annots)
     liftIO $ putStrLn "=========== comments:"
-    liftIO $ putStrLn $ show (snd annots)
+    -- liftIO $ putStrLn $ show (snd annots)
     liftIO $ putStrLn "=========== renamed source:"
 
     (rnSrc, tcSrc) <- ((\t -> (tm_renamed_source t, typecheckedSource t)) <$> typecheckModule p)
                          `gcatch` \(e :: SomeException) -> forcedTypecheck ms p
-    liftIO $ putStrLn $ show rnSrc
+    -- liftIO $ putStrLn $ show rnSrc
 
     -- liftIO $ putStrLn $ show (fromJust $ tm_renamed_source t)
     liftIO $ putStrLn "=========== typechecked source:"
-    liftIO $ putStrLn $ show tcSrc
+    -- liftIO $ putStrLn $ show tcSrc
 
     let hasCPP = Cpp `xopt` ms_hspp_opts ms
 
@@ -138,7 +138,7 @@ forcedTypecheck ms p = do
                                                                 <*> return (tcg_rn_exports gbl)
                                                                 <*> return (tcg_doc_hdr gbl)
                                                         , tcg_binds gbl)
-      liftIO $ modifyIORef (tcg_th_modfinalizers gblEnv) (finalizeModule :)
+      -- liftIO $ modifyIORef (tcg_th_modfinalizers gblEnv) (finalizeModule :)
       let gblEnv' = gblEnv { tcg_rn_exports = Just [], tcg_rn_decls = Just emptyRnGroup }
       liftIO $ initTcRnIf 'a' env gblEnv' lclEnv $ void (tcRnModuleTcRnM env ms hpm (ms_mod ms, getLoc (pm_parsed_source p)))
                                                      `gcatch` \(_ :: SomeException) -> return ()

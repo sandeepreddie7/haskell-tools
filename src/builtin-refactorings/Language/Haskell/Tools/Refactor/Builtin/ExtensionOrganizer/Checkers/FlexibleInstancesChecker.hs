@@ -175,7 +175,7 @@ hasOnlyDistinctTyVars ty
 dropCasts :: GHC.Type -> GHC.Type
 dropCasts (GHC.CastTy ty _)     = dropCasts ty
 dropCasts (GHC.AppTy t1 t2)     = GHC.mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts (GHC.FunTy t1 t2)     = GHC.mkFunTy (dropCasts t1) (dropCasts t2)
+dropCasts (GHC.FunTy t t1 t2)   = GHC.mkFunTy t (dropCasts t1) (dropCasts t2)
 dropCasts (GHC.TyConApp tc tys) = GHC.mkTyConApp tc (map dropCasts tys)
 dropCasts (GHC.ForAllTy b ty)   = GHC.ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                    = ty

@@ -25,6 +25,7 @@ import PrelNames as GHC
 import ConLike as GHC
 import PatSyn as GHC
 import BasicTypes as GHC
+import TyCoRep as GHC
 
 import Language.Haskell.Tools.Rewrite.ElementTypes as AST
 import Language.Haskell.Tools.Rewrite.Match as AST
@@ -45,7 +46,7 @@ typeExpr' (InfixApp lhs op rhs) = do
   case splitFunTys opt of
     (lhsT:rhsT:rest, resTyp) -> do
       let subst = tcUnifyTys (\_ -> BindMe) [lhsType, rhsType] [lhsT, rhsT]
-      return $ maybe id substTy subst $ repack (mkFunTys rest resTyp)
+      return $ maybe id substTy subst $ repack (mkVisFunTys rest resTyp)
     _ -> resultType
 typeExpr' (PrefixApp op rhs) = do
   let opType = idType $ semanticsId (op ^. operatorName)
@@ -68,7 +69,7 @@ typeExpr' (App f arg) = do
 typeExpr' (Lambda args e) = do
   (resType, recomp) <- splitType' <$> typeExpr' e
   (argTypes, recomps) <- unzip <$> mapM (\_ -> splitType' <$> resultType) (args ^? annList)
-  return $ foldr (.) recomp recomps $ mkFunTys argTypes resType
+  return $ foldr (.) recomp recomps $ mkVisFunTys argTypes resType
 typeExpr' (Let _ e) = typeExpr' e
 typeExpr' (If _ then' _) = typeExpr' then'
 typeExpr' (MultiIf alts) =
@@ -113,7 +114,7 @@ typeExpr' (RightSection op rhs) = do
   case splitFunTys ft of 
     (arg1:arg2:rest, resTyp) -> do 
       let subst = tcUnifyTy arg2 argType
-      return $ maybe id substTy subst $ repack (mkFunTys (arg1:rest) resTyp)
+      return $ maybe id substTy subst $ repack (mkVisFunTys (arg1:rest) resTyp)
     _ -> resultType
 typeExpr' (AST.RecCon name _) 
   = do def <- lift $ maybe (return Nothing) GHC.lookupName (semanticsName (name ^. simpleName))
@@ -151,7 +152,7 @@ appTypeMatches insts functionT argTs -- TODO: check instances
         argTypes = fst $ unzip $ map splitType argTs
      in if length args >= length argTypes
           then case tcUnifyTys (\_ -> BindMe) (take (length argTypes) args) argTypes of
-                 Just st -> let (t', check) = repackFun st insts (substTy st $ mkFunTys (drop (length argTypes) args) resT)
+                 Just st -> let (t', check) = repackFun st insts (substTy st $ mkVisFunTys (drop (length argTypes) args) resT)
                              in if check then Just (st, t')
                                          else Nothing
                  Nothing -> Nothing
@@ -165,7 +166,7 @@ splitType typ =
   let (foralls, typ') = splitForAllTys typ
       (args, coreType) = splitFunTys typ'
       (implicitArgs, realArgs) = partition isPredTy args
-      repack subst insts t = (mkInvForAllTys (filter (`elem` tvs) foralls) . mkFunTys keptConstraints $ t, check)
+      repack subst insts t = (mkInvForAllTys (filter (`elem` tvs) foralls) . mkVisFunTys keptConstraints $ t, check)
         where
           check = and $ map checkInst implicitArgs
           checkInst t =
@@ -180,7 +181,7 @@ splitType typ =
           keptConstraints = filter hasCommonTv implicitArgs
           tvs = tyCoVarsOfTypeWellScoped t
           hasCommonTv = not . null . intersect tvs . tyCoVarsOfTypeWellScoped
-   in (mkFunTys realArgs coreType, repack)
+   in (mkVisFunTys realArgs coreType, repack)
 
 resultType :: StateT [Unique] Ghc GHC.Type
 resultType = do 
@@ -195,7 +196,7 @@ litType constraint = do
     Just (ATyCon numTyCon) -> do
       name <- newName
       let tv = mkTyVar name (GHC.typeKind boolTy)
-      return $ mkInvForAllTys [tv] $ mkFunTy (mkTyConApp numTyCon [mkTyVarTy tv]) (mkTyVarTy tv)
+      return $ mkInvForAllTys [tv] $ mkVisFunTy (mkTyConApp numTyCon [mkTyVarTy tv]) (mkTyVarTy tv)
     _ -> error "Type.litType: not found"
 
 newName :: Monad m => StateT [Unique] m GHC.Name

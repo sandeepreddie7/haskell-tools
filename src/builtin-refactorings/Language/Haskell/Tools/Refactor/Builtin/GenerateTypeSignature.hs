@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, LiberalTypeSynonyms #-}
 
 module Language.Haskell.Tools.Refactor.Builtin.GenerateTypeSignature
   ( generateTypeSignature, generateTypeSignature', tryItOut
@@ -17,6 +17,7 @@ import Outputable as GHC (Outputable(..), showSDocUnsafe)
 import TyCon as GHC (TyCon(..), isTupleTyCon)
 import Type as GHC
 import TysWiredIn as GHC (listTyCon, charTyCon)
+import TyCoRep as GHC
 
 import Control.Monad
 import Control.Monad.State
@@ -109,7 +110,7 @@ generateTypeFor prec t
   , not (null preds)
   = do ctx <- case preds of [pred] -> mkContext <$> generateAssertionFor pred
                             _      -> mkContext <$> (mkTupleAssertion <$> mapM generateAssertionFor preds)
-       wrapParen 0 <$> (mkCtxType ctx <$> generateTypeFor 0 (mkFunTys other rt))
+       wrapParen 0 <$> (mkCtxType ctx <$> generateTypeFor 0 (mkVisFunTys other rt))
   -- function
   | Just (at, rt) <- splitFunTy_maybe t
   = wrapParen 0 <$> (mkFunctionType <$> generateTypeFor 10 at <*> generateTypeFor 0 rt)
