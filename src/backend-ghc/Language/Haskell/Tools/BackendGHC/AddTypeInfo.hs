@@ -81,7 +81,7 @@ addTypeInfos bnds mod = do
         --       Collecting only HsOverLits doesn't work,
         --       because they contain only UnhelpfulSrcSpans
         decompedOverloadedLits :: [(SrcSpan, Type)]
-        decompedOverloadedLits = catMaybes $ map decompExprLit exprLits ++ map decompPatLit patLits
+        decompedOverloadedLits = catMaybes $ map decompExprLit exprLits ++ (map (\pat -> Just (getLoc pat, decompPatLit $ unLoc pat)) patLits)
           where exprLits :: [LHsExpr GhcTc]
                 exprLits = concatMap universeBi . bagToList $ bnds
 
@@ -92,9 +92,7 @@ addTypeInfos bnds mod = do
                 patLits :: [LPat GhcTc]
                 patLits = concatMap universeBi . bagToList $ bnds
 
-                decompPatLit :: LPat GhcTc -> Maybe (SrcSpan, Type)
-                decompPatLit (L loc (NPat llit _ _ _)) = Just (loc, llit)
-                decompPatLit x = Nothing
+                decompPatLit (NPat llit _ _ _) = llit
 
 
         mkUnknownType :: IO Type

@@ -50,13 +50,14 @@ loadPackagesFrom report loadCallback additionalSrcDirs packages =
      modColls <- liftIO $ getAllModules packages
      st <- get
      moreSrcDirs <- liftIO $ mapM (additionalSrcDirs st) packages
-     lift $ useDirs ((modColls ^? traversal & mcSourceDirs & traversal) ++ concat moreSrcDirs)
+     lift $ useDirs (concat (_mcSourceDirs <$> modColls) ++ concat moreSrcDirs)
      mcs' <- liftIO (traversal !~ locateModules $ modColls)
-     modify' (refSessMCs .- (++ mcs'))
-     mcs <- gets (^. refSessMCs)
+     let org = _refSessMCs st
+     modify' (\st -> st{_refSessMCs = mcs' ++ org})
+     mcs <- gets (_refSessMCs)
      let alreadyLoadedFiles
-           = concatMap (map (^. sfkFileName) . Map.keys . Map.filter (isJust . (^? typedRecModule)) . (^. mcModules))
-                       (filter (\mc -> (mc ^. mcRoot) `notElem` packages) mcs)
+           = concatMap (\x -> map (^. sfkFileName) . Map.keys . Map.filter (\y -> True) $ _mcModules x)
+                       (filter (\mc -> (_mcRoot mc) `notElem` packages) mcs)
      currentTargets <- map targetId <$> (lift getTargets)
      lift $ mapM_ (\t -> when (targetId t `notElem` currentTargets) (addTarget t))
                   (map makeTarget $ List.nubBy ((==) `on` (^. sfkFileName))
@@ -64,19 +65,20 @@ loadPackagesFrom report loadCallback additionalSrcDirs packages =
      loadRes <- gtry (loadModules mcs alreadyLoadedFiles)
      case loadRes of
        Right mods -> do
-         modify (refSessMCs & traversal & filtered (\mc -> (mc ^. mcId) `elem` map (^. mcId) modColls) & mcLoadDone .= True)
+         modify (\st -> st{_refSessMCs = map (\x -> x{_mcLoadDone = True}) $ filter (\mc -> (_mcId mc) `elem` map (_mcId) modColls) (_refSessMCs st)})
          compileModules report mods
        Left err -> return [err]
 
   where getExposedModules :: ModuleCollection k -> [k]
-        getExposedModules
-          = Map.keys . Map.filter (\v -> fromMaybe True (v ^? recModuleExposed)) . (^. mcModules)
+        getExposedModules mod
+          = Map.keys . Map.filter (\v -> (_recModuleExposed v)) $ (_mcModules mod)
 
         locateModules :: ModuleCollection ModuleNameStr -> IO (ModuleCollection SourceFileKey)
-        locateModules mc
-          = mcModules !~ ((Map.fromList <$>)
-                            . mapM (locateModule (mc ^. mcSourceDirs) (mc ^. mcModuleFiles))
-                            . Map.assocs) $ mc
+        locateModules mc = do
+          val <- ((Map.fromList <$>)
+                            . mapM (locateModule (_mcSourceDirs mc) (_mcModuleFiles mc))
+                            . Map.assocs) $ _mcModules mc
+          pure $ mc {_mcModules = val}
 
         locateModule :: [FilePath] -> [(ModuleNameStr, FilePath)]
                           -> (ModuleNameStr, ModuleRecord) -> IO (SourceFileKey,ModuleRecord)
@@ -107,7 +109,7 @@ loadPackagesFrom report loadCallback additionalSrcDirs packages =
             modsForColls <- lift $ depanal [] True
             let modsToParse = flattenSCCs $ topSortModuleGraph False modsForColls Nothing
                 actuallyCompiled = filter (\ms -> getModSumOrig ms `notElem` alreadyLoaded) modsToParse
-            modify' (refSessMCs .- foldl (.) id (map (insertIfMissing . keyFromMS) actuallyCompiled))
+            -- modify' ({_refSessMCs = foldl (.) id (map (insertIfMissing . keyFromMS) actuallyCompiled)})
             return actuallyCompiled
           liftIO $ loadCallback mods
           return mods
@@ -130,16 +132,17 @@ loadVisiblePackages = do
   dfs <- getSessionDynFlags
   (dfs', _) <- liftIO $ initPackages dfs
   setSessionDynFlags dfs' -- set the package flags (only for this load session)
-  modify' (pkgDbFlags .= \dfs -> dfs { pkgDatabase = pkgDatabase dfs'
+
+  modify' (\st -> st{_pkgDbFlags = \dfs -> dfs { pkgDatabase = pkgDatabase dfs'
                                      , pkgState = pkgState dfs'
-                                     }) -- save the package database
+                                     }}) -- save the package database
 
 -- | Get the module that is selected for refactoring and all the other modules.
 getFileMods :: String -> DaemonSession ( Maybe (SourceFileKey, UnnamedModule)
                                        , [(SourceFileKey, UnnamedModule)] )
 getFileMods fnameOrModule = do
-  modMaps <- gets (^? refSessMCs & traversal & mcModules)
-  let modules = mapMaybe (\(k,m) -> (\ms tc -> (ms, (k,tc))) <$> (m ^? modRecMS) <*> (m ^? typedRecModule)) -- not type checkable modules are ignored
+  modMaps <- gets (\st -> map (\x -> _mcModules x) (_refSessMCs st))
+  let modules = mapMaybe (\(k,m) -> (\ms tc -> (ms, (k,tc))) <$> (Just $ _modRecMS m) <*> (Just $ _typedRecModule m)) -- not type checkable modules are ignored
                   $ concatMap @[] Map.assocs modMaps
       (modSel, modOthers) = List.partition (\(ms,_) -> getModSumName ms == fnameOrModule
                                                          && (case ms_hsc_src ms of HsSrcFile -> True; _ -> False))
@@ -197,7 +200,7 @@ clearModules mods = do
 -- modules need to be reloaded after a change.
 getReachableModules :: ([ModSummary] -> IO ()) -> (ModSummary -> Bool) -> DaemonSession [ModSummary]
 getReachableModules loadCallback selected = do
-  mcs <- gets (^. refSessMCs)
+  mcs <- gets (\st -> _refSessMCs st)
   withLoadFlagsForModules mcs $ do
     lift $ depanal [] True
     sortedRecompMods <- lift $ dependentModules (return . selected)
@@ -207,21 +210,20 @@ getReachableModules loadCallback selected = do
 -- | Reload a given module. Perform a callback.
 reloadModule :: (ModSummary -> IO a) -> ModSummary -> DaemonSession a
 reloadModule report ms = do
-  mcs <- gets (^. refSessMCs)
-  ghcfl <- gets (^. ghcFlagsSet)
+  mcs <- gets (_refSessMCs)
+  ghcfl <- gets (_ghcFlagsSet)
   let codeGen = needsGeneratedCode (keyFromMS ms) mcs
       mc = decideMC ms mcs
   newm <- withFlagsForModule mc $ lift $ do
-    dfs <- liftIO $ fmap ghcfl $ mc ^. mcFlagSetup $ ms_hspp_opts ms
+    dfs <- liftIO $ fmap ghcfl $ _mcFlagSetup mc $ ms_hspp_opts ms
     let ms' = ms { ms_hspp_opts = dfs }
     -- some flags are cached in mod summary, so we need to override
     parseTyped (case codeGen of NoCodeGen -> ms'
                                 InterpretedCode -> forceCodeGen ms'
                                 GeneratedCode -> forceAsmGen ms')
   -- replace the module in the program database
-  modify' $ refSessMCs & traversal & filtered (\c -> (c ^. mcId) == (mc ^. mcId)) & mcModules
-              .- Map.insert (keyFromMS ms) (ModuleTypeChecked newm ms codeGen)
-                   . removeModuleMS ms
+  modify' (\st -> st{_refSessMCs = map (\x -> x{_mcModules = Map.insert (keyFromMS ms) (ModuleTypeChecked newm ms codeGen) (removeModuleMS ms $ _mcModules x)})
+                                   $ filter (\c -> (_mcId c) == _mcId mc) (_refSessMCs st)})
   liftIO $ report ms
 
 -- | Select which module collection we think the module is in
@@ -229,7 +231,7 @@ decideMC :: ModSummary -> [ModuleCollection SourceFileKey] -> ModuleCollection S
 decideMC ms mcs =
   case lookupModuleCollection ms mcs of
     Just mc -> mc
-    Nothing -> case filter (\mc -> (mc ^. mcRoot) `List.isPrefixOf` fileName) mcs of
+    Nothing -> case filter (\mc -> (_mcRoot mc) `List.isPrefixOf` fileName) mcs of
                  mc:_ -> mc
                  _ -> case mcs of mc:_ -> mc
                                   []   -> error "reloadModule: module collections empty"
@@ -238,12 +240,12 @@ decideMC ms mcs =
 -- | Prepares the DynFlags for the compilation of a module
 withFlagsForModule :: ModuleCollection SourceFileKey -> DaemonSession a -> DaemonSession a
 withFlagsForModule mc action = do
-  ghcfl <- gets (^. ghcFlagsSet)
-  dbFlags <- gets (^. pkgDbFlags)
+  ghcfl <- gets (_ghcFlagsSet)
+  dbFlags <- gets (_pkgDbFlags)
   -- IMPORTANT: make sure that the module collection is not passed into the flags, they
   -- might not be evaluated and then the reference could prevent garbage collection
   -- of entire ASTs
-  withAlteredDynFlags (liftIO . fmap (dbFlags . ghcfl) . ((mc ^. mcFlagSetup) <=< (mc ^. mcLoadFlagSetup))) action
+  withAlteredDynFlags (liftIO . fmap (dbFlags . ghcfl) . ((_mcFlagSetup mc) <=< (_mcLoadFlagSetup mc))) action
 
 -- | Prepares the DynFlags for travesing the module graph
 withLoadFlagsForModules :: [ModuleCollection SourceFileKey] -> DaemonSession a -> DaemonSession a
@@ -251,27 +253,27 @@ withLoadFlagsForModules :: [ModuleCollection SourceFileKey] -> DaemonSession a -
 -- might not be evaluated and then the reference could prevent garbage collection
 -- of entire ASTs
 withLoadFlagsForModules mcs action = do
-  ghcfl <- gets (^. ghcFlagsSet)
-  dbFlags <- gets (^. pkgDbFlags)
+  ghcfl <- gets (_ghcFlagsSet)
+  dbFlags <- gets (_pkgDbFlags)
   withAlteredDynFlags (liftIO . fmap (dbFlags . ghcfl)
-                              . setupLoadFlags (mcs ^? traversal & mcId) (mcs ^? traversal & mcRoot)
-                                               (mcs ^? traversal & mcDependencies & traversal)
-                                               (foldl @[] (>=>) return (mcs ^? traversal & mcLoadFlagSetup))) action
+                              . setupLoadFlags (map (\x -> _mcId x) mcs) (map (\x -> _mcRoot x) mcs)
+                                               (concat (map (\x -> _mcDependencies x) mcs))
+                                               (foldl @[] (>=>) return  (map (\x -> _mcLoadFlagSetup x) mcs))) action
 
 -- | Finds out if a newly added module forces us to generate code for another one.
 -- If the other is already loaded it will be reloaded.
 checkEvaluatedMods :: [ModSummary] -> DaemonSession ()
 checkEvaluatedMods changed = do
-    mcs <- gets (^. refSessMCs)
+    mcs <- gets (_refSessMCs)
     -- IMPORTANT: make sure that the module collection is not passed into the flags, they
     -- might not be evaluated and then the reference could prevent garbage collection
     -- of entire ASTs
-    let lookupFlags ms = maybe return (^. mcFlagSetup) mc $ ms_hspp_opts ms
+    let lookupFlags ms = maybe return (_mcFlagSetup) mc $ ms_hspp_opts ms
           where mc = lookupModuleCollection ms mcs
     (modsNeedCode, modsNeedAsm) <- lift (getEvaluatedMods changed lookupFlags)
     -- specify the need of code generation for later loading
-    forM_ modsNeedCode (\ms -> modify $ refSessMCs .- codeGeneratedFor (keyFromMS ms) InterpretedCode)
-    forM_ modsNeedAsm (\ms -> modify $ refSessMCs .- codeGeneratedFor (keyFromMS ms) GeneratedCode)
+    forM_ modsNeedCode (\ms -> modify (\st -> st{_refSessMCs = codeGeneratedFor (keyFromMS ms) InterpretedCode (_refSessMCs st) }))
+    forM_ modsNeedAsm (\ms -> modify (\st -> st{_refSessMCs = codeGeneratedFor (keyFromMS ms) GeneratedCode(_refSessMCs st) }))
     let interpreted = filter (\ms -> isAlreadyLoaded (keyFromMS ms) InterpretedCode mcs)
                              modsNeedCode
         codeGenerated = filter (\ms -> isAlreadyLoaded (keyFromMS ms) GeneratedCode mcs) modsNeedAsm

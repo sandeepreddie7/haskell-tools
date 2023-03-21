@@ -2,10 +2,11 @@ module Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Checkers.Flexi
 
 import TcType (tcSplitNestedSigmaTys, checkValidClsArgs)
 import Type hiding (Type(..))
-import PrelNames (eqTyConName, eqTyConKey)
+import PrelNames (eqTyConKey)
 import Unique (hasKey)
 import qualified Name as GHC
 import qualified GHC
+import Name (isTyConName)
 
 import Data.List
 import Data.Generics.Uniplate.Data()
@@ -37,7 +38,7 @@ chkAssertion a@(ClassAssert con annTys) = do
 chkAssertion a@(InfixAssert lhs op rhs)
   -- If the constraint is of form a ~ b, then we dont need to check
   | Just name <- semanticsName op
-  , name == eqTyConName
+  , isTyConName name
   = return a
   -- If the constraint has only type variable heads, it doesn't need FlexibleContexts
   | hasTyVarHead lhs && hasTyVarHead rhs = return a
@@ -75,7 +76,7 @@ chkClassesInside t = maybe (addFC t) f (splitTypeAppMaybe t)
     f :: (GHC.Name, [Type]) -> ExtMonad ()
     f (n,args) = do
        isClass <- isJustT . lookupClass $ n
-       when (n /= eqTyConName && isClass && any (not . hasTyVarHead) args)
+       when (not $ isTyConName n && isClass && any (not . hasTyVarHead) args)
             (addFC t)
 
     -- Separates the type into its head and its arguments.

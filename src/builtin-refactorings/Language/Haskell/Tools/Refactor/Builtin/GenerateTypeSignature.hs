@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, LiberalTypeSynonyms #-}
 
 module Language.Haskell.Tools.Refactor.Builtin.GenerateTypeSignature
   ( generateTypeSignature, generateTypeSignature', tryItOut

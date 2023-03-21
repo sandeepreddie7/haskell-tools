@@ -23,7 +23,7 @@ fvType (TyConApp _ tys)      = fvTypes tys
 fvType LitTy{}               = []
 fvType (AppTy fun arg)       = fvType fun ++ fvType arg
 fvType (FunTy arg res)       = fvType arg ++ fvType res
-fvType (ForAllTy (TvBndr tv _) ty)
+fvType (ForAllTy (Bndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
 fvType (CastTy ty co)        = fvType ty ++ fvCo co
@@ -33,7 +33,7 @@ fvTypes :: [Type] -> [TyVar]
 fvTypes = concatMap fvType
 
 fvCo :: Coercion -> [TyCoVar]
-fvCo (Refl _ ty)            = fvType ty
+fvCo (Refl ty)            = fvType ty
 fvCo (TyConAppCo _ _ args)  = concatMap fvCo args
 fvCo (AppCo co arg)         = fvCo co ++ fvCo arg
 fvCo (ForAllCo tv h co)     = filter (/= tv) (fvCo co) ++ fvCo h
@@ -46,7 +46,7 @@ fvCo (TransCo co1 co2)      = fvCo co1 ++ fvCo co2
 fvCo (NthCo _ _ co)           = fvCo co
 fvCo (LRCo _ co)            = fvCo co
 fvCo (InstCo co arg)        = fvCo co ++ fvCo arg
-fvCo (CoherenceCo co1 co2)  = fvCo co1 ++ fvCo co2
+-- fvCo (CoherenceCo co1 co2)  = fvCo co1 ++ fvCo co2
 fvCo (KindCo co)            = fvCo co
 fvCo (SubCo co)             = fvCo co
 fvCo (AxiomRuleCo _ cs)     = concatMap fvCo cs
