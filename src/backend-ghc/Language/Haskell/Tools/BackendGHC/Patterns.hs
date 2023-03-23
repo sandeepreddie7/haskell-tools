@@ -46,7 +46,7 @@ trfPattern p = trfLocNoSema trfPattern' (correctPatternLoc p)
    -- | Locations for right-associative infix patterns are incorrect in GHC AST
     correctPatternLoc p@(ConPatIn _ (InfixCon left right))
       = L (getLoc (correctPatternLoc left) `combineSrcSpans` getLoc (correctPatternLoc right)) p
-    correctPatternLoc p@(ConPatIn _ (PrefixCon (x:xs)))  = L (getLoc (correctPatternLoc x)) p
+    correctPatternLoc p = L (getLoc p) p
 
 
 
@@ -69,7 +69,7 @@ trfPattern' (SplicePat _ splice) = AST.USplicePat <$> trfSplice splice
 trfPattern' (LitPat _ lit) = AST.ULitPat <$> annCont (pure $ RealLiteralInfo (monoLiteralType lit)) (trfLiteral' lit)
 trfPattern' (NPat _ (ol_val . unLoc -> lit) _ _) = AST.ULitPat <$> annCont (asks contRange >>= pure . PreLiteralInfo) (trfOverloadedLit lit)
 trfPattern' (NPlusKPat _ id (L l lit) _ _ _) = AST.UNPlusKPat <$> define (trfName @n id) <*> annLoc (asks contRange >>= pure . PreLiteralInfo) (pure l) (trfOverloadedLit (ol_val lit))
--- trfPattern' (SigPat _ pat typ) = AST.UTypeSigPat <$> trfPattern pat <*> trfType (hsib_body $ hswc_body typ)
+-- trfPattern' p@(SigPat _ pat typ) =  trfPattern' pat
 trfPattern' (CoPat _ _ pat _) = trfPattern' pat -- coercion pattern introduced by GHC
 trfPattern' (SumPat _ pat tag arity)
   = do sepsBefore <- focusBeforeLoc (srcSpanStart (getLoc pat)) (eachTokenLoc (AnnOpen : replicate (tag - 1) AnnVbar))
