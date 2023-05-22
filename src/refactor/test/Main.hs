@@ -42,7 +42,7 @@ checkCorrectlyPrinted workingDir moduleName
        expected <- hGetContents expectedHandle
        actual <- runGhc (Just libdir) $ do
          parsed <- loadModule workingDir moduleName
-         prettyPrint <$> parseTyped parsed
+         prettyPrint <$> parseTyped' workingDir parsed
        assertEqual "The original and the transformed source differ" expected actual
 
 

@@ -175,7 +175,7 @@ reloadAllMods dir = do
   void $ lift $ load LoadAllTargets
   targets <- lift getTargets
   forM_ (map ((\case (TargetModule n) -> n) . targetId) targets) $ \modName -> do
-      mod <- lift $ getModSummary modName >>= parseTyped
+      mod <- lift $ getModSummary modName >>= parseTyped'
       modify $ refSessMods .- Map.insert (dir, GHC.moduleNameString modName, dir </> moduleSourceFile (GHC.moduleNameString modName)) mod
 
 createFileForModule :: FilePath -> String -> String -> IO ()

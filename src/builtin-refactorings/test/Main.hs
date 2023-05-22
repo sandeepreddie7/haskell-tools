@@ -391,7 +391,7 @@ testRefactor refact moduleName
   = runGhc (Just libdir) $ do
       initGhcFlags
       useDirs [rootDir]
-      mod <- loadModule rootDir moduleName >>= parseTyped
+      mod <- loadModule rootDir moduleName >>= parseTyped'
       res <- runRefactor (SourceFileKey (rootDir </> moduleSourceFile moduleName) moduleName, mod) [] (localRefactoring $ refact mod)
       case res of Right r -> return $ Right $ prettyPrint $ snd $ fromContentChanged $ head r
                   Left err -> return $ Left err
@@ -423,8 +423,8 @@ performRefactors command workingDir flags target = do
       allMods <- getModuleGraph
       selectedMod <- getModSummary (GHC.mkModuleName target)
       let otherModules = filter (not . (\ms -> ms_mod ms == ms_mod selectedMod && ms_hsc_src ms == ms_hsc_src selectedMod)) (mgModSummaries allMods)
-      targetMod <- parseTyped selectedMod
-      otherMods <- mapM parseTyped otherModules
+      targetMod <- parseTyped' selectedMod
+      otherMods <- mapM (parseTyped') otherModules
       res <- performCommand builtinRefactorings (splitOn " " command)
                             (Right (SourceFileKey (workingDir </> moduleSourceFile target) target, targetMod))
                             (zip (map keyFromMS otherModules) otherMods)

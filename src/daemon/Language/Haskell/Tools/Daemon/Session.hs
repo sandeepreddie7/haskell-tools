@@ -295,13 +295,13 @@ checkEvaluatedMods changed = do
 -- | Re-load the module with code generation enabled. Must be used when the module had already been loaded,
 -- but code generation were not enabled by then.
 codeGenForModule :: [ModuleCollection SourceFileKey] -> CodeGenPolicy -> ModSummary -> DaemonSession ()
-codeGenForModule mcs codeGen ms
+codeGenForModule mcs codeGen ms = undefined
 -- we don't need to update anything, just re-compile (we don't store the typed AST) and generate the code
-  = withFlagsForModule mc $ lift $ void $ parseTyped (case codeGen of InterpretedCode -> forceCodeGen ms
-                                                                      GeneratedCode -> forceAsmGen ms
-                                                                      _ -> ms)
-  where mc = fromMaybe (error $ "codeGenForModule: The following module is not found: " ++ getModSumName ms)
-               $ lookupModuleCollection ms mcs
+  -- = withFlagsForModule mc $ lift $ void $ parseTyped (case codeGen of InterpretedCode -> forceCodeGen ms
+  --                                                                     GeneratedCode -> forceAsmGen ms
+  --                                                                     _ -> ms)
+  -- where mc = fromMaybe (error $ "codeGenForModule: The following module is not found: " ++ getModSumName ms)
+  --              $ lookupModuleCollection ms mcs
 
 -- | Check which modules can be reached from the module, if it uses template haskell.
 -- A definition that needs code generation can be inside a module that does not uses the
