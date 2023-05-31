@@ -215,14 +215,16 @@ parseTyped modSum = withAlteredDynFlags (return . normalizeFlags) $ do
     -- adding 'import qualified GHC.Records.Extra' back to import list without '(implicit)' 
   let fileData = (pragmas ++ x ++ "\nimport qualified GHC.Records.Extra\n" ++ y)
       newFileData' = replace "hasField r\n    =" "hasField r\n    = undefined --" fileData
-      newFileData = replace "{-# OPTIONS_GHC -fplugin RecordDotPreprocessor #-}" "-- {-# OPTIONS_GHC -fplugin RecordDotPreprocessor #-}" newFileData'
-  if isInfixOf "-- {-# OPTIONS_GHC -fplugin RecordDotPreprocessor #-}" fileData then parseTyped' ms' else do
-    liftIO $ writeToFile (ms_hspp_file ms') newFileData
-    void $ load (LoadUpTo $ mkModuleName $ getModSumName ms')
-    ms'' <- getModSummary $ mkModuleName $ getModSumName ms'
-    let ndf = removeDynFlag $ ms_hspp_opts ms''
-    setSessionDynFlags ndf
-    parseTyped' $ ms'' { ms_hspp_opts = ndf }
+      newFileData = replace "{-# OPTIONS_GHC -fplugin" "-- {-# OPTIONS_GHC -fplugin" newFileData'
+  if isInfixOf "-- {-# OPTIONS_GHC -fplugin" fileData then parseTyped' ms' else
+    if isInfixOf "-fplugin" fileData then do
+      liftIO $ writeToFile (ms_hspp_file ms') newFileData
+      void $ load (LoadUpTo $ mkModuleName $ getModSumName ms')
+      ms'' <- getModSummary $ mkModuleName $ getModSumName ms'
+      let ndf = removeDynFlag $ ms_hspp_opts ms''
+      setSessionDynFlags ndf
+      parseTyped' $ ms'' { ms_hspp_opts = ndf }
+    else parseTyped' ms'
 
 parseTyped' :: ModSummary -> Ghc TypedModule
 parseTyped' ms = do

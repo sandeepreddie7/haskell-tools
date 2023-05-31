@@ -16,6 +16,7 @@ import Language.Haskell.Tools.Refactor.Builtin.LetRefactoring (changeReturnToLet
 import Language.Haskell.Tools.Refactor.Builtin.ShowTree (showAstTree)
 import Language.Haskell.Tools.Refactor.Builtin.ChangeMonad (changeMonadRefactoring)
 import Language.Haskell.Tools.Refactor.Builtin.WriteBack (writeBackRefactoring)
+import Language.Haskell.Tools.Refactor.Builtin.Ref1 (encodeDecodeTransformRef)
 import Language.Haskell.Tools.Refactor.Builtin.AutoCorrect
 
 builtinRefactorings :: [RefactoringChoice]
@@ -36,6 +37,7 @@ builtinRefactorings
     , changeMonadRefactoring
     , showAstTree
     , writeBackRefactoring
+    , encodeDecodeTransformRef
     ]
 
 builtinQueries :: [QueryChoice]

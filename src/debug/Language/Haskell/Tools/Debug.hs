@@ -10,7 +10,7 @@ import Control.Monad
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Reference ((^.))
 import Data.List.Split (splitOn)
-import Data.List.Extra (replace)
+import Data.List.Extra (replace, isInfixOf)
 import Data.Maybe (Maybe(..), fromJust)
 import GHC.Generics (Generic(..))
 import System.FilePath (pathSeparator, (</>), (<.>))
@@ -84,6 +84,7 @@ demoRefactor1 flag command workingDir args moduleName =
     liftIO $ putStrLn "=========== parsed source:"
 
     ms <- loadModule workingDir moduleName
+    liftIO $ putStrLn "=========== LOADS source:"
     hsc_env' <- getSession
     dynflags' <- if flag == 1 then liftIO (initializePlugins hsc_env' (GHC.ms_hspp_opts ms))
                  else if flag == 2 || flag == 3 then liftIO (initializePlugins hsc_env' (removeDynFlag $ GHC.ms_hspp_opts ms))
@@ -102,30 +103,30 @@ demoRefactor1 flag command workingDir args moduleName =
     let hasCPP = Cpp `xopt` ms_hspp_opts ms
     liftIO $ putStrLn "=========== parsed:"
     parseTrf <- runTrf (fst annots) (getPragmaComments $ snd annots) $ trfModule ms (pm_parsed_source p)
-    liftIO $ putStrLn $ srcInfoDebug parseTrf
+    -- liftIO $ putStrLn $ srcInfoDebug parseTrf
 
     liftIO $ putStrLn "=========== typed:"
     transformed <- addTypeInfos tcSrc =<< (runTrf (fst annots) (getPragmaComments $ snd annots) $ trfModuleRename ms parseTrf (fromJust $ rnSrc) (pm_parsed_source p))
-    liftIO $ putStrLn $ srcInfoDebug transformed
+    -- liftIO $ putStrLn $ srcInfoDebug transformed
 
     liftIO $ putStrLn "=========== ranges fixed:"
     sourceOrigin <- if hasCPP then liftIO $ hGetStringBuffer (workingDir </> map (\case '.' -> pathSeparator; c -> c) moduleName <.> "hs")
                               else return (fromJust $ ms_hspp_buf $ pm_mod_summary p)
     let commented = fixRanges $ placeComments (fst annots) (getNormalComments $ snd annots) $ fixMainRange sourceOrigin transformed
-    liftIO $ putStrLn $ srcInfoDebug commented
+    -- liftIO $ putStrLn $ srcInfoDebug commented
 
     liftIO $ putStrLn "=========== cut up:"
     let cutUp = cutUpRanges commented
-    liftIO $ putStrLn $ srcInfoDebug cutUp
-    liftIO $ putStrLn $ show $ getLocIndices cutUp
-    liftIO $ putStrLn $ show $ mapLocIndices sourceOrigin (getLocIndices cutUp)
+    -- liftIO $ putStrLn $ srcInfoDebug cutUp
+    -- liftIO $ putStrLn $ show $ getLocIndices cutUp
+    -- liftIO $ putStrLn $ show $ mapLocIndices sourceOrigin (getLocIndices cutUp)
 
     liftIO $ putStrLn "=========== sourced:"
     let sourced = (if hasCPP then extractStayingElems else id) $ rangeToSource sourceOrigin cutUp
-    liftIO $ putStrLn $ srcInfoDebug sourced
+    -- liftIO $ putStrLn $ srcInfoDebug sourced
 
-    liftIO $ print $ "Dynflags :: "  ++ show (moduleNameFS <$> pluginModNames (ms_hspp_opts $ pm_mod_summary p))
-    liftIO $ print $ "AST Parse :: " ++ (showSDocUnsafe $ ppr $ pm_parsed_source p)
+    -- liftIO $ print $ "Dynflags :: "  ++ show (moduleNameFS <$> pluginModNames (ms_hspp_opts $ pm_mod_summary p))
+    -- liftIO $ print $ "AST Parse :: " ++ (showSDocUnsafe $ ppr $ pm_parsed_source p)
 
     let hasCppExtension = Cpp `xopt` ms_hspp_opts modSum
     srcBuffer <- if hasCppExtension
@@ -133,22 +134,26 @@ demoRefactor1 flag command workingDir args moduleName =
                     else return (fromJust $ ms_hspp_buf $ pm_mod_summary p)
 
     -- removing (implicit) as it causes parse error 
-    let pragmas = ((head $ (splitOn "module" (strBufToStr $ srcBuffer))))
+
+    let pragmas = ((head $ (splitOn "module" (strBufToStr srcBuffer))))
         x       = ((head $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p))))
         y       = ((last $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p))))
-
-    -- adding 'import qualified GHC.Records.Extra' back to import list without '(implicit)' 
     let fileData = (pragmas ++ x ++ "\nimport qualified GHC.Records.Extra\n" ++ y)
-        newFileData = replace "hasField r\n    =" "hasField r\n    = undefined --" fileData
     -- TODO :: Add extra newLine
     -- liftIO $ putStrLn $ ("fileData :: " ++ fileData)
         -- finalStr   = replace "\n " "UNIQUE" fileData
         -- finalStr'  = replace "\n" "\n\n" finalStr
         -- finalStr'' = replace "UNIQUE" "\n " finalStr'
 
-    if flag == 1 then do
-      liftIO $ writeToFile' workingDir (moduleName ++ ".hs") newFileData
+    if (flag == 1) && not (isInfixOf "-- {-# OPTIONS_GHC -fplugin" fileData) then do
+
+    -- adding 'import qualified GHC.Records.Extra' back to import list without '(implicit)' 
+      let fileData' = replace "{-# OPTIONS_GHC -fplugin" "-- {-# OPTIONS_GHC -fplugin" fileData
+          fileData'' = replace "{-# ANN type" "-- {-# ANN type" fileData'
+          newFileData = replace "hasField r\n    =" "hasField r\n    = undefined --" fileData''
+      liftIO $ writeToFile (ms_hspp_file ms) newFileData
       liftIO $ demoRefactor1 2 command workingDir args moduleName
+    else if (flag == 1) && (isInfixOf "-- {-# OPTIONS_GHC -fplugin" fileData) then liftIO $ demoRefactor1 2 command workingDir args moduleName
     else if flag == 2 then do
       liftIO $ print $ "Refactor Case"
       transformed <- performCommand builtinRefactorings (splitOn " " command)
@@ -158,62 +163,62 @@ demoRefactor1 flag command workingDir args moduleName =
         Right changes -> do
           forM_ changes $ \case
             ContentChanged (mod, correctlyTransformed) -> do
-              liftIO $ putStrLn $ "=========== transformed AST (" ++ (mod ^. sfkModuleName) ++ "):"
-              liftIO $ putStrLn $ srcInfoDebug correctlyTransformed
-              liftIO $ putStrLn $ "=========== transformed & prettyprinted (" ++ (mod ^. sfkModuleName) ++ "):"
-              let prettyPrinted = prettyPrint correctlyTransformed
-              liftIO $ putStrLn prettyPrinted
-              liftIO $ putStrLn $ "=========== Write into file (" ++ (mod ^. sfkModuleName) ++ "):"
+              -- liftIO $ putStrLn $ "=========== transformed AST (" ++ (mod ^. sfkModuleName) ++ "):"
+              -- liftIO $ putStrLn $ srcInfoDebug correctlyTransformed
+              -- liftIO $ putStrLn $ "=========== transformed & prettyprinted (" ++ (mod ^. sfkModuleName) ++ "):"
+              -- let prettyPrinted = prettyPrint correctlyTransformed
+              -- liftIO $ putStrLn prettyPrinted
+              -- liftIO $ putStrLn $ "=========== Write into file (" ++ (mod ^. sfkModuleName) ++ "):"
               liftIO $ applyChanges correctlyTransformed mod workingDir
               liftIO $ putStrLn "==========="
             ModuleRemoved mod -> do
               liftIO $ putStrLn $ "=========== module removed: " ++ mod
             ModuleCreated mod cont _ -> do
-              liftIO $ putStrLn $ "=========== created AST (" ++ mod ++ "):"
-              liftIO $ putStrLn $ srcInfoDebug cont
-              liftIO $ putStrLn $ "=========== created & prettyprinted (" ++ mod ++ "):"
-              let prettyPrinted = prettyPrint cont
-              liftIO $ putStrLn prettyPrinted
+              -- liftIO $ putStrLn $ "=========== created AST (" ++ mod ++ "):"
+              -- liftIO $ putStrLn $ srcInfoDebug cont
+              -- liftIO $ putStrLn $ "=========== created & prettyprinted (" ++ mod ++ "):"
+              -- let prettyPrinted = prettyPrint cont
+              liftIO $ putStrLn "+++++"
         Left transformProblem -> do
+          -- liftIO $ putStrLn "==========="
+          -- liftIO $ putStrLn transformProblem
           liftIO $ putStrLn "==========="
-          liftIO $ putStrLn transformProblem
-          liftIO $ putStrLn "==========="
-      liftIO $ demoRefactor1 3 command workingDir args moduleName
+      -- liftIO $ demoRefactor1 3 command workingDir args moduleName
     else 
       -- write back to (.)
       liftIO $ print $ "Write-Back Case"
     -- 'writeBack' refactoring Fn converts 'GHC.Records.Extra.getField' to '.'
     -- gets invoked when flag == 3
-    if flag == 3 then do
-      transformed <- performCommand builtinRefactorings (splitOn " " "writeBack")
-                                    (Right ((SourceFileKey (moduleSourceFile moduleName) moduleName), sourced))
-                                    []
-      case transformed of
-        Right changes -> do
-          forM_ changes $ \case
-            ContentChanged (mod, correctlyTransformed) -> do
-              liftIO $ putStrLn $ "=========== transformed AST (" ++ (mod ^. sfkModuleName) ++ "):"
-              liftIO $ putStrLn $ srcInfoDebug correctlyTransformed
-              liftIO $ putStrLn $ "=========== transformed & prettyprinted (" ++ (mod ^. sfkModuleName) ++ "):"
-              let prettyPrinted = prettyPrint correctlyTransformed
-              liftIO $ putStrLn prettyPrinted
-              liftIO $ putStrLn $ "=========== Write into file (" ++ (mod ^. sfkModuleName) ++ "):"
-              liftIO $ applyChanges correctlyTransformed mod workingDir
-              liftIO $ putStrLn "==========="
-            ModuleRemoved mod -> do
-              liftIO $ putStrLn $ "=========== module removed: " ++ mod
-            ModuleCreated mod cont _ -> do
-              liftIO $ putStrLn $ "=========== created AST (" ++ mod ++ "):"
-              liftIO $ putStrLn $ srcInfoDebug cont
-              liftIO $ putStrLn $ "=========== created & prettyprinted (" ++ mod ++ "):"
-              let prettyPrinted = prettyPrint cont
-              liftIO $ putStrLn prettyPrinted
-        Left transformProblem -> do
-          liftIO $ putStrLn "==========="
-          liftIO $ putStrLn transformProblem
-          liftIO $ putStrLn "==========="
-    else return ()
-
+    -- if flag == 3 then do
+    --   transformed <- performCommand builtinRefactorings (splitOn " " "writeBack")
+    --                                 (Right ((SourceFileKey (moduleSourceFile moduleName) moduleName), sourced))
+    --                                 []
+    --   case transformed of
+    --     Right changes -> do
+    --       forM_ changes $ \case
+    --         ContentChanged (mod, correctlyTransformed) -> do
+              -- liftIO $ putStrLn $ "=========== transformed AST (" ++ (mod ^. sfkModuleName) ++ "):"
+              -- liftIO $ putStrLn $ srcInfoDebug correctlyTransformed
+    --           liftIO $ putStrLn $ "=========== transformed & prettyprinted (" ++ (mod ^. sfkModuleName) ++ "):"
+    --           let prettyPrinted = prettyPrint correctlyTransformed
+    --           liftIO $ putStrLn prettyPrinted
+    --           liftIO $ putStrLn $ "=========== Write into file (" ++ (mod ^. sfkModuleName) ++ "):"
+    --           liftIO $ applyChanges correctlyTransformed mod workingDir
+    --           liftIO $ putStrLn "==========="
+    --         ModuleRemoved mod -> do
+    --           liftIO $ putStrLn $ "=========== module removed: " ++ mod
+    --         ModuleCreated mod cont _ -> do
+    --           liftIO $ putStrLn $ "=========== created AST (" ++ mod ++ "):"
+    --           liftIO $ putStrLn $ srcInfoDebug cont
+    --           liftIO $ putStrLn $ "=========== created & prettyprinted (" ++ mod ++ "):"
+    --           let prettyPrinted = prettyPrint cont
+    --           liftIO $ putStrLn prettyPrinted
+    --     Left transformProblem -> do
+    --       liftIO $ putStrLn "==========="
+    --       liftIO $ putStrLn transformProblem
+    --       liftIO $ putStrLn "==========="
+    -- else return ()
+-- UApp {_exprFun = UApp {_exprFun = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "map"}}}}, _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "encodeDecodeTransform"}}}}}, _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "gatewayInClause"}}}}}
 writeToFile' tdir file str = do 
   setCurrentDirectory tdir
   liftIO $ withBinaryFile file WriteMode $ \handle -> do

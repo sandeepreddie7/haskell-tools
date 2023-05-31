@@ -79,6 +79,8 @@ trfExpr' (OpApp _ e1 (unLoc -> HsVar _ op) e2)
   = AST.UInfixApp <$> trfExpr e1 <*> trfOperator @n op <*> trfExpr e2
 trfExpr' (OpApp _ e1 (L nameLoc (HsRecFld _ fld)) e2)
   = AST.UInfixApp <$> trfExpr e1 <*> trfAmbiguousOperator' nameLoc fld <*> trfExpr e2
+-- trfExpr' (OpApp _ e1 (L nameLoc ((HsUnboundVar _ op))) e2)
+--   = AST.UInfixApp <$> trfExpr e1 <*> trfOperator @n (L nameLoc (occNameString $ unboundVarOcc op)) <*> trfExpr e2
 trfExpr' (OpApp _ _ (L _ op) _) = unhandledElement "OpApp expression" op
 trfExpr' (NegApp _ e _) = AST.UPrefixApp <$> annLocNoSema loc (AST.UNormalOp <$> annLoc info loc (AST.nameFromList <$> trfOperatorStr False "-"))
                                        <*> trfExpr e

@@ -38,7 +38,7 @@ cutUpRanges n = evalState (cutUpRanges' n) [[],[]]
                       case stack of 
                         (below1 : top : xs) -> do
                           let below = filter isGoodSrcSpan below1
-                          let res = f (trace ("Reached cutUpRanges 1" ++ show below) below) ni
+                          let res = f (below) ni
                           let ranges = getRange res
                           if (isGoodSrcSpan ranges) then put ([] : (top ++ [ ranges ]) : xs) else  put ([] : (top : xs))
                           return res
@@ -52,8 +52,8 @@ cutOutElemSpan sps (NormNodeInfo (RealSrcSpan sp))
         breakFirstHit opt (elem:rest) sp
           = case breakUpRangeElem elem sp of
              -- only continue if the correct place for the child range is not found
-              Just pieces -> trace "Reached cutOutElemSpan 1"  $ pieces ++ rest
-              Nothing -> trace ("Reached cutOutElemSpan 2" ++ show elem) $ elem : (breakFirstHit False) rest sp
+              Just pieces -> pieces ++ rest
+              Nothing -> elem : (breakFirstHit False) rest sp
         breakFirstHit opt sps (RealSrcSpan inner) = [RangeChildElem] --trace "Reached cutOutElemSpan 3" $ throw $ BreakUpProblem sp inner sps
         breakFirstHit opt [] inner = trace ("Reached cutOutElemSpan 3" ++ show sps) $ throw $ BreakUpProblem sp inner sps
 cutOutElemSpan _ (NormNodeInfo (UnhelpfulSpan {}))
@@ -74,7 +74,7 @@ instance Exception BreakUpProblem
 
 cutOutElemList :: [SrcSpan] -> ListInfo NormRangeStage -> ListInfo RngTemplateStage
 cutOutElemList sps (NormListInfo bef aft sep indented sp)
-  = let range = foldl1 combineSrcSpans $ trace ("Reached cutOutElemList 1" ++ (show (sp : sps))) $ sp : sps
+  = let range = foldl1 combineSrcSpans $ sp : sps
         wholeRange = getFakeRange range
      in RangeTemplateList wholeRange bef aft sep indented (getSeparators wholeRange sps)
 
@@ -122,8 +122,8 @@ fixRanges node = evalState (sourceInfoTraverseUp (SourceInfoTrf (trf expandToCon
         trf f ni = do stack <- get
                       case stack of
                         (below : top : xs) -> do
-                          let res = f (trace ("Reached fixRanges 1" ++ show below ) below) ni
-                              resRange = trace ("Reached fixRanges 2" ++ (show $ getRange res)) $ getRange res
+                          let res = f (below) ni
+                              resRange = getRange res
                               endOfSiblings = srcSpanEnd (collectSpanRanges (srcSpanStart resRange) top)
                               correctedRange = if endOfSiblings > srcSpanStart resRange
                                                  then mkSrcSpan endOfSiblings (max endOfSiblings (srcSpanEnd resRange))
@@ -139,15 +139,15 @@ fixRanges node = evalState (sourceInfoTraverseUp (SourceInfoTrf (trf expandToCon
 -- | Expand a simple node to contain its children
 expandToContain :: [SrcSpan] -> SpanInfo RangeStage -> SpanInfo NormRangeStage
 expandToContain cont (NodeSpan sp)
-  =  NormNodeInfo (trace ("Reached expandToContain 2") $ checkSpans cont $ trace ("Reached expandToContain 1") $ foldl1 combineSrcSpans $ sp : cont)
+  =  NormNodeInfo (checkSpans cont $ foldl1 combineSrcSpans $ sp : cont)
 
 expandListToContain :: [SrcSpan] -> ListInfo RangeStage -> ListInfo NormRangeStage
 expandListToContain cont (ListPos bef aft def ind sp)
-  =   NormListInfo bef aft def ind (trace ("Reached expandListToContain 2") $ checkSpans cont $ trace ("Reached expandListToContain 1") $ collectSpanRanges sp cont)
+  =   NormListInfo bef aft def ind (checkSpans cont $ collectSpanRanges sp cont)
 
 expandOptToContain :: [SrcSpan] -> OptionalInfo RangeStage -> OptionalInfo NormRangeStage
 expandOptToContain cont (OptionalPos bef aft sp)
-  =  NormOptInfo bef aft (trace ("Reached expandOptToContain 2") $ checkSpans cont $ trace ("Reached expandOptToContain 1") $ collectSpanRanges sp cont)
+  =  NormOptInfo bef aft (checkSpans cont $ collectSpanRanges sp cont)
 
 collectSpanRanges :: SrcLoc -> [SrcSpan] -> SrcSpan
 collectSpanRanges loc@(RealSrcLoc _) [] = srcLocSpan loc
@@ -156,6 +156,6 @@ collectSpanRanges _ ls = foldl combineSrcSpans noSrcSpan ls
 -- | Checks the contained source ranges to detect the convertion problems where we can see their location.
 checkSpans :: [SrcSpan] -> SrcSpan -> SrcSpan
 checkSpans spans res
-  = if (trace ("Reached checkSpans 2" ++ (show $ any (not . isGoodSrcSpan) spans) ++ (show $ shortShowSpan <$> spans)) $ any (not . isGoodSrcSpan) spans) && (trace ("Reached checkSpans 1" ++ show (isGoodSrcSpan res) ++ shortShowSpan res) $ isGoodSrcSpan res)
+  = if (any (not . isGoodSrcSpan) spans) && isGoodSrcSpan res
       then trfProblem $ "Wrong src spans in " ++ show res
       else res

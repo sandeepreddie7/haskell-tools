@@ -12,8 +12,9 @@ module Language.Haskell.Tools.Refactor.Builtin.WriteBack where
 import Language.Haskell.Tools.Refactor as Refactor hiding (LambdaCase)
 import Language.Haskell.Tools.Refactor.Utils.Extensions
 import Language.Haskell.Tools.Rewrite.Match.Binds
+-- import Language.Haskell.Tools.AST.Representation.Binds as AST
 
-import GHC (Ghc(..))
+import GHC
 import Module as GHC
 import InstEnv as GHC
 import Unify as GHC
@@ -87,6 +88,16 @@ check _ = True
 --                   _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "pm"}}}}}, 
 --       _exprArg = ULit {_exprLit = UStringLit {_stringLitValue = "MASTER"}}}
 
+-- UInfixApp {_exprLhs = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "x"}}}},
+--            _exprOperator = UNormalOp {_operatorName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "^."}}},
+--            _exprRhs = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [UNamePart {_simpleNameStr = "L"}], _unqualifiedName = UNamePart {_simpleNameStr = "_merchantAccountId"}}}}}
+
+-- ULet {_exprFunBind = [ULocalValBind {_localVal = USimpleBind {_valBindPat = UVarPat {_patternName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "dingding"}}}},
+--                                                               _valBindRhs = UUnguardedRhs {_rhsExpr = UParen {_exprInner = UApp {_exprFun = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "encodeDecodeTransform"}}}},
+--                                                                                                                                  _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "scope"}}}}}}},
+--                                                               _valBindLocals = Nothing}}],
+--       _exprInner = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "dingding"}}}}}
+
 logicFn :: Expr -> Ghc Expr 
 logicFn expr@(App (ExplicitTypeApp (Var e1) (PromotedStringType ty)) (Var arg)) = do 
                             let fnName  = showName e1  
@@ -100,4 +111,27 @@ logicFn expr@(App (App (ExplicitTypeApp (Var e1) (PromotedStringType ty)) (Var a
                             if fnName == "setField"
                                 then return $ mkVar $ mkName $ (objName ++ "{" ++ ty ++ " = \"" ++ val ++ "\"}")
                             else return expr
-logicFn x = trace ("Extra setFiled " ++ show x) $ return x
+-- logicFn expr@(Let (LocalBinds [(SimpleBind _ (UnguardedRhs (Paren (App (Var arg1) (Var arg2)))) _ )]) (Var arg)) = do
+--     let !y1 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg)) $ showName arg
+--     let !y2 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg1)) $ showName arg
+--     return expr
+
+-- ULet {_exprFunBind = [ULocalValBind {_localVal = USimpleBind {_valBindPat = UVarPat {_patternName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "dongg"}}}},
+--                                                               _valBindRhs = UUnguardedRhs {_rhsExpr = UApp {_exprFun = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "encodeDecodeTransform"}}}},
+--                                                                                                             _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "keyUuid"}}}}}},
+--                                                               _valBindLocals = Nothing}}], _exprInner = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "dongg"}}}}}
+
+-- logicFn expr@(Let (AST.AnnListG annot [LocalValBind (SimpleBind _ (UnguardedRhs ((App (Var arg1) (Var arg2)))) _ )]) (Var arg)) = do
+--     let !y1 = trace ("Extra LocalValBind 1 " ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg)) $ showName arg
+--     let !y2 = trace ("Extra LocalValBind 1 " ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg2)) $ showName arg
+--     return $ mkVar $ mkName $ "Just " ++ showName arg2
+-- logicFn expr@(Let (AST.AnnListG annot [LocalValBind (SimpleBind _ (UnguardedRhs (Paren (App (Var arg1) (Var arg2)))) _ )]) (Var arg)) = do
+--     -- let y = x ^. simpleBind
+--     let !y1 = trace ("Extra LocalValBind 1 " ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg)) $ showName arg
+--     let !y2 = trace ("Extra LocalValBind 1 " ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg2)) $ showName arg
+--     return expr
+-- logicFn expr@(InfixApp (Var arg) op (Var arg1)) = do
+--     let !y1 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg)) $ showName arg
+--     let !y2 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg1)) $ showName arg
+--     return expr
+logicFn x = return x

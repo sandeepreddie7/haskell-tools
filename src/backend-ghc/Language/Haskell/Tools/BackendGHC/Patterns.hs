@@ -83,7 +83,7 @@ trfPattern' (SumPat _ pat tag arity)
   where makePlaceholder l = (annLocNoSema (pure (srcLocSpan l)) (pure AST.UUnboxedSumPlaceHolder))
 trfPattern' (XPat l) = AST.UXPat <$> annLocNoSema (pure (logAndGetLoc l)) (pure $ AST.UWildPat)
   where
-    logAndGetLoc l = trace ("Reached XPAT" ++ (AST.shortShowSpan $ getLoc l)) $ getLoc l
+    logAndGetLoc l = getLoc l
 trfPattern' p = unhandledElement "pattern" p
 
 trfPatternField' :: forall n r p . (TransformName n r, n ~ GhcPass p) => HsRecField n (LPat n) -> Trf (AST.UPatternField (Dom r) RangeStage)

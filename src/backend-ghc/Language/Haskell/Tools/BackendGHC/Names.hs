@@ -38,6 +38,9 @@ import Language.Haskell.Tools.BackendGHC.Utils
 trfOperator :: forall n r . TransformName n r => Located (IdP n) -> Trf (Ann AST.UOperator (Dom r) RangeStage)
 trfOperator = trfLocNoSema (trfOperator' @n)
 
+-- trfOperators :: forall n r . TransformName n r => IdP n -> Trf (Ann AST.UOperator (Dom r) RangeStage)
+-- trfOperators = trfLocNoSema (trfOperator' @n)
+
 trfOperator' :: forall n r . TransformName n r => IdP n -> Trf (AST.UOperator (Dom r) RangeStage)
 trfOperator' n
   | isSymOcc (occName @n n) = AST.UNormalOp <$> (trfQualifiedNameFocus @n) True n

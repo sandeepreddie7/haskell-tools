@@ -15,11 +15,10 @@ packages:
   - src/cli
   - src/debug
   - src/daemon
-  - ../classyplate
 
 extra-deps:
-  # - git: https://github.com/Chaitanya-nair/classyplate.git
-  #   commit: e5f24f3355c132982d11a4cf6a17762505bee7f7
+  - git: https://github.com/Chaitanya-nair/classyplate.git
+    commit: 46f5e0e7073e1d047f70473bf3c75366a613bfeb
   - git: https://github.com/Chaitanya-nair/watch.git
     commit: 1f87bf8ca2825b89b4c5465118034784da9630c5
   - git: https://github.com/Chaitanya-nair/references.git
