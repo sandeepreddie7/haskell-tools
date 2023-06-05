@@ -1,4 +1,9 @@
-resolver: lts-17.2
+resolver: lts-18.19
+
+nix:
+  enable: true
+  packages: [zlib.dev, zlib.out]
+
 
 ghc-options:
   "$locals": -fwarn-unused-binds -fwarn-unused-matches -fwarn-unused-imports
@@ -15,14 +20,13 @@ packages:
   - src/cli
   - src/debug
   - src/daemon
-  - ../classyplate
-  - ../watch
+  # - ../classyplate
 
 extra-deps:
-  # - git: https://github.com/Chaitanya-nair/classyplate.git
-  #   commit: e5f24f3355c132982d11a4cf6a17762505bee7f7
-  # - git: https://github.com/Chaitanya-nair/watch.git
-  #   commit: 1f87bf8ca2825b89b4c5465118034784da9630c5
+  - git: https://github.com/Chaitanya-nair/classyplate.git
+    commit: 46f5e0e7073e1d047f70473bf3c75366a613bfeb
+  - git: https://github.com/Chaitanya-nair/watch.git
+    commit: 1f87bf8ca2825b89b4c5465118034784da9630c5
   - git: https://github.com/Chaitanya-nair/references.git
     commit: cdeb9dd7c7e3e0aff11bb826c47ae8c782db27a2
   - Cabal-3.0.0.0
@@ -48,6 +52,9 @@ extra-deps:
   # - th-abstraction-0.3.2.0@sha256:9b5b4e6e2bbff9b075ad7751ee98e2107090bd17b51d5442695b8990e4db6521
   - th-abstraction-0.4.5.0@sha256:c28f186ae9817a059e54f63689f8985194b7f58d8fbd79e157d12374b6f9d2c3
   - strict-0.4.0.1@sha256:d6205a748eb8db4cd17a7179be970c94598809709294ccfa43159c7f3cc4bf5d
+  - dlist-0.8.0.8@sha256:90ca348bffdc62d7070bcf0e97c728f8d01b24fbc7ea08d2909157d0da76534c,2066
+  # - haskeline-0.7.5.0@sha256:eef356225f9eca04323b4a24abaeccd9188387d33cfaf587a025c7ee0fa64d88,4968
+
   # - recv-0.1.0@sha256:04058c90ed3d2821b92e589dd3428f5a6e9d49ab405296dda3583304cb0b9bb3,1755
 
 #   - references-0.3.3.1@sha256:1f8e4568d345e5e1482d8c9fca9c48b6ca1b04db6b02edd1023a9c33a2b8a5a2,6446
