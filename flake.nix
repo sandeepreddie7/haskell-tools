@@ -55,7 +55,6 @@
             blaze-markup.source = "0.8.2.8";
             bsb-http-chunked.source = "0.0.0.4";
             byteorder.source = "1.0.4";
-            Cabal.source = "3.2.1.0";
             case-insensitive.source = "1.2.1.0";
             cereal.source = "0.5.8.2";
             classyplate.source = inputs.classyplate;
@@ -129,10 +128,6 @@
             word8.source = "0.1.3";
           };
           settings = {
-            Cabal = {
-              jailbreak = true;
-              check = false;
-            };
             aeson = {
               jailbreak = true;
               check = false;
