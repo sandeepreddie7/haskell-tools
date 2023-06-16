@@ -13,7 +13,7 @@ import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Reference hiding (modifyMVarMasked_)
-import Data.Algorithm.Diff (Diff(..), getGroupedDiff)
+import Data.Algorithm.Diff
 import Data.Algorithm.DiffContext (prettyContextDiff, getContextDiff)
 import qualified Data.ByteString.Char8 as StrictBS (unpack, readFile)
 import Data.Either (Either(..), either, rights)
