@@ -1,3 +1,13 @@
 packages:
   src/ast
+  src/backend-ghc
+  src/rewrite
+  src/prettyprint
+  src/refactor
+  src/builtin-refactorings
+  src/experimental-refactorings
+  demo
+  src/cli
+  src/debug
+  src/daemon
 

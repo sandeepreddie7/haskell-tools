@@ -1,18 +1,18 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    haskell-flake.url = "github:srid/haskell-flake";
-    classyplate.url = "github:Chaitanya-nair/classyplate/46f5e0e7073e1d047f70473bf3c75366a613bfeb";
     classyplate.flake = false;
-    watch.url = "github:Chaitanya-nair/watch/cdeb9dd7c7e3e0aff11bb826c47ae8c782db27a2";
-    watch.flake = false;
-    references.url = "github:eswar2001/references/35912f3cc72b67fa63a8d59d634401b79796469e";
-    references.flake = true;
-    inspection-testing.url = "github:nomeata/inspection-testing/18f40a0be7d78a23a344c1f94034bed645985915";
-    inspection-testing.flake = false;
-    direct-sqlite.url = "github:IreneKnapp/direct-sqlite";
+    classyplate.url = "github:Chaitanya-nair/classyplate/46f5e0e7073e1d047f70473bf3c75366a613bfeb";
     direct-sqlite.flake = false;
+    direct-sqlite.url = "github:IreneKnapp/direct-sqlite";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    fswatch.flake = true;
+    fswatch.url = "github:eswar2001/watch/41839963961c6890c62a74d24056f4769fdf137b";
+    haskell-flake.url = "github:srid/haskell-flake";
+    inspection-testing.flake = false;
+    inspection-testing.url = "github:nomeata/inspection-testing/18f40a0be7d78a23a344c1f94034bed645985915";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    references.flake = true;
+    references.url = "github:eswar2001/references/35912f3cc72b67fa63a8d59d634401b79796469e";
   };
   outputs = inputs @ {
     self,
@@ -27,53 +27,14 @@
       perSystem = {
         self',
         pkgs,
+        lib,
+        config,
         ...
       }: {
         haskellProjects.default = {
           basePackages = pkgs.haskell.packages.ghc8107;
-
           packages = {
-            # ansi-terminal.source = "0.11.1";
-            # array.source = "0.5.4.0";
-            # async.source = "2.2.4";
-            # base-orphans.source = "0.8.6";
-            # base.source = "4.14.3.0";
-            # binary.source = "0.8.8.0";
-            # bytestring.source = "0.10.12.0";
-            # call-stack.source = "0.3.0";
-            # colour.source = "2.3.6";
-            # containers.source = "0.6.5.1";
-            # deepseq.source = "1.4.4.0";
-            # directory.source = "1.3.6.0";
-            # either.source = "5.0.1.1";
-            # exceptions.source = "0.10.4";
-            # filepath.source = "1.4.2.1";
-            # ghc-boot-th.source = "8.10.7";
-            # hashable.source = "1.3.0.0";
-            # haskell-tools-ast.source = "1.1.1.0";
-            # hfsevents.source = "0.1.6";
-            # hie-compat.source = "0.3.1.1";
-            # integer-gmp.source = "1.0.3.0";
-            # mtl.source = "2.2.2";
-            # Only.source = "0.1";
-            # parsec.source = "3.1.14.0";
-            # pretty.source = "1.1.3.6";
-            # primitive.source = "0.7.3.0";
-            # process.source = "1.6.13.2";
-            # random.source = "1.2.1.1";
-            # shower.source = inputs.shower;
-            # splitmix.source = "0.1.0.4";
-            # stm.source = "2.5.0.1";
-            # template-haskell.source = "2.16.0.0";
-            # text-short.source = "0.1.3";
-            # text.source = "1.2.5.0";
-            # time-compat.source = "1.9.5";
-            # time.source = "1.9.3";
-            # transformers.source = "0.5.6.2";
-            # unix-compat.source = "0.5.3";
-            # unix.source = "2.7.2.2";
-            # x509.source = "1.7.5";
-            # zlib.source = "0.6.2.3";
+            Diff.source = "0.4.0";
             abstract-deque.source = "0.3";
             abstract-par.source = "0.3.3";
             aeson.source = "1.5.4.1";
@@ -109,6 +70,8 @@
             easy-file.source = "0.2.2";
             filemanip.source = "0.3.6.3";
             fsnotify.source = "0.3.0.1";
+            fswatch.source = inputs.fswatch;
+            Glob.source = "0.9.3";
             haskeline.source = "0.8.0.0";
             hlint.source = "3.4.1";
             hourglass.source = "0.2.12";
@@ -120,8 +83,10 @@
             instance-control.source = "0.1.2.0";
             integer-logarithms.source = "1.0.3.1";
             iproute.source = "1.7.12";
+            knob.source = "0.1.1";
             math-functions.source = "0.3.4.2";
             memory.source = "0.15.0";
+            minisat-solver.source = "0.1";
             monad-par-extras.source = "0.3.3";
             mwc-random.source = "0.15.0.2";
             network-byte-order.source = "0.1.6";
@@ -145,7 +110,6 @@
             strict.source = "0.4.0.1";
             syb.source = "0.7.2.1";
             tagged.source = "0.8.6.1";
-            terminfo.source = "0.4.1.4";
             th-abstraction.source = "0.4.5.0";
             these.source = "1.1.1.1";
             time-manager.source = "0.0.0";
@@ -162,18 +126,9 @@
             vector-th-unbox.source = "0.2.2";
             vector.source = "0.12.3.1";
             wai.source = "3.2.3";
-            watch.source = inputs.watch;
             word8.source = "0.1.3";
           };
           settings = {
-            happy = {
-              check = false;
-            };
-            classyplate = {
-              broken = false;
-              libraryProfiling = false;
-              haddock = false;
-            };
             Cabal = {
               jailbreak = true;
               check = false;
@@ -206,11 +161,6 @@
               check = false;
               haddock = false;
             };
-            references = {
-              check = false;
-              haddock = false;
-              libraryProfiling = false;
-            };
             ghc-lib-parser = {
               check = false;
               haddock = false;
@@ -238,10 +188,155 @@
               haddock = false;
               jailbreak = true;
             };
+            references = {
+              check = false;
+              haddock = false;
+              libraryProfiling = true;
+              broken = false;
+            };
+            Diff = {
+              check = false;
+              haddock = false;
+            };
+            Glob = {
+              check = false;
+              haddock = false;
+            };
+            foundation = {
+              jailbreak = true;
+              check = false;
+              broken = false;
+            };
+            happy = {
+              check = false;
+              broken = false;
+            };
+            classyplate = {
+              broken = false;
+              libraryProfiling = true;
+              haddock = false;
+            };
+            ncurses = {
+              broken = false;
+            };
+            http2 = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            co-log-core = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            ormolu = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            hls-plugin-api = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            hls-eval-plugin = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            hls-hlint-plugin = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            tasty = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            knob = {
+              jailbreak = true;
+            };
+            haskell-tools-demo = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            haskell-tools-rewrite = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            haskell-tools-refactor = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            haskell-tools-ast = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            haskell-tools-builtin-refactorings = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+            };
+            haskell-tools-daemon = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+              libraryProfiling = false;
+            };
+            haskell-tools-experimental-refactorings = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+              libraryProfiling = false;
+            };
+            haskell-tools-cli = {
+              check = false;
+              haddock = false;
+              broken = false;
+              jailbreak = true;
+              libraryProfiling = false;
+            };
+            haskeline = {
+              check = false;
+              haddock = false;
+              broken = false;
+            };
           };
         };
-
-        packages.default = self'.packages.haskell-tools-ast;
+        packages = {
+          default = let
+            localCabalPackages =
+              builtins.map
+              (p:
+                if p.exes != {}
+                then lib.getBin p.package
+                else null)
+              (lib.attrValues config.haskellProjects.default.outputs.packages);
+          in
+            pkgs.symlinkJoin {
+              name = "haskell-tools";
+              paths = localCabalPackages;
+            };
+        };
       };
     };
 }
