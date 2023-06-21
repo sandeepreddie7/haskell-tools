@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Language.Haskell.Tools.Refactor.Builtin.OrganizeImports
   ( organizeImports, projectOrganizeImports
@@ -37,6 +38,7 @@ import Data.List
 import Data.Maybe (Maybe(..), maybe, catMaybes)
 
 import Language.Haskell.Tools.Refactor as AST
+import Language.Haskell.Tools.Refactor.Builtin.WriteBack
 
 organizeImportsRefactoring :: RefactoringChoice
 organizeImportsRefactoring = ModuleRefactoring "OrganizeImports" (localRefactoring organizeImports)
@@ -46,7 +48,14 @@ projectOrganizeImportsRefactoring = ProjectRefactoring "ProjectOrganizeImports" 
 
 projectOrganizeImports :: ProjectRefactoring
 projectOrganizeImports mods
-  = mapM (\(k, m) -> ContentChanged . (k,) <$> localRefactoringRes id m (organizeImports m)) mods
+  = mapM (\(k, m) -> ContentChanged . (k,) <$> localRefactoringRes id m (organizeImports' m)) mods
+
+organizeImports' :: LocalRefactoring
+organizeImports' moduleAST =
+        do
+            !newAST1 <- organizeImports moduleAST
+            !newAST <- writeBack newAST1
+            return newAST
 
 organizeImports :: LocalRefactoring
 organizeImports mod

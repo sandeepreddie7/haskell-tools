@@ -34,6 +34,12 @@ library
                      , criterion                 >= 1.1 && < 1.6
                      , mtl                       >= 2.2 && < 2.3
                      , ghci
+                     , strict
+                     , Diff
+                     , directory
+                     , text
+                     , extra
+                     , pretty
   default-language:    Haskell2010
 
 executable ht-debug

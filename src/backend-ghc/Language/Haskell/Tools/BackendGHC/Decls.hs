@@ -103,6 +103,8 @@ trfDeclsGroup g@(HsGroup _ vals splices tycls derivs fixities defaults foreigns 
     mergeSplice decls spl@(L spLoc@(RealSrcSpan rss) _)
       = L spLoc (SpliceD NoExtField (SpliceDecl NoExtField spl ExplicitSplice)) : filter (\(L (RealSrcSpan rdsp) _) -> not (rss `containsSpan` rdsp)) decls
     mergeSplice _ (L (UnhelpfulSpan {}) _) = convProblem "mergeSplice: no real span"
+    mergeSplice x y = error "Non exhaustive pattern in mergeSplice"
+
 
     getDeclsToInsert :: Trf [Ann AST.UDecl (Dom (GhcPass r)) RangeStage]
     getDeclsToInsert = do decls <- asks declsToInsert

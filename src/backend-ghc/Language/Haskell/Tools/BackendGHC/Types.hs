@@ -68,6 +68,7 @@ trfType' = trfType'' where
   trfType'' pt@(HsTyLit {}) = AST.UTyPromoted <$> annContNoSema (trfPromoted' trfType' pt)
   trfType'' (HsWildCardTy _) = pure AST.UTyWildcard -- TODO: named wildcards
   trfType'' (HsSumTy _ types) = AST.UUnbSumType <$> trfAnnList " | " trfType' types
+  -- trfType'' (HsStarTy _ _) = pure AST.UTyWildcard -- TODO: named wildcards
   trfType'' t = unhandledElement "type" t
 
 trfBindings :: (TransformName n r, HasCallStack) => [Located (HsTyVarBndr (GhcPass n))] -> Trf (AnnListG AST.UTyVar (Dom (GhcPass r)) RangeStage)
@@ -110,6 +111,7 @@ trfAssertion' t = case base of
    HsTyVar _ _ name -> AST.UClassAssert <$> trfName @n name <*> trfAnnList " " trfType' args
    -- HsEqTy t1 t2 -> AST.UInfixAssert <$> trfType t1 <*> annLocNoSema (tokenLoc AnnTilde) (trfOperator' @n typeEq) <*> trfType t2
    HsIParamTy _ name t -> AST.UImplicitAssert <$> define (focusOn (getLoc name) (trfImplicitName (unLoc name))) <*> trfType t
+  --  HsForAllTy _ bndrs typ -> trfAssertion' (unLoc typ)
    t -> unhandledElement "assertion" t
   where (args, _, base) = getArgs t
 

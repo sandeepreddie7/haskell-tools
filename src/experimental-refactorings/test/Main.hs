@@ -53,7 +53,7 @@ testRefactor refact moduleName
   = runGhc (Just libdir) $ do
       initGhcFlags
       useDirs [rootDir]
-      mod <- loadModule rootDir moduleName >>= parseTyped
+      mod <- loadModule rootDir moduleName >>= (parseTyped' rootDir)
       res <- runRefactor (SourceFileKey (rootDir </> moduleSourceFile moduleName) moduleName, mod) [] (localRefactoring $ refact mod)
       case res of Right r -> return $ Right $ prettyPrint $ snd $ fromContentChanged $ head r
                   Left err -> return $ Left err

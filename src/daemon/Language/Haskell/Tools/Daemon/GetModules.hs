@@ -49,10 +49,10 @@ getAllModules pathes = orderMCs . concat <$> mapM getModules (map normalise path
 orderMCs :: [ModuleCollection k] -> [ModuleCollection k]
 orderMCs = sortBy compareMCs
   where compareMCs :: ModuleCollection k -> ModuleCollection k -> Ordering
-        compareMCs mc _ | DirectoryMC _ <- (mc ^. mcId) = GT
-        compareMCs _ mc | DirectoryMC _ <- (mc ^. mcId) = LT
-        compareMCs mc1 mc2 | (mc2 ^. mcId) `elem` (mc1 ^. mcDependencies) = GT
-        compareMCs mc1 mc2 | (mc1 ^. mcId) `elem` (mc2 ^. mcDependencies) = LT
+        compareMCs mc _ | DirectoryMC _ <- (_mcId mc) = GT
+        compareMCs _ mc | DirectoryMC _ <- (_mcId mc) = LT
+        compareMCs mc1 mc2 | (_mcId mc2) `elem` (_mcDependencies mc1) = GT
+        compareMCs mc1 mc2 | (_mcId mc1) `elem` (_mcDependencies mc2) = LT
         compareMCs _ _ = EQ
 
 
@@ -187,7 +187,6 @@ getMain' bi
                _ -> "Main"
   where ls = dropWhile (/= "-main-is") (getOptions $ options bi)
         getOptions (PerCompilerFlavor _ a) = a
-
 
 -- | Checks if the module collection created from a folder without .cabal file.
 isDirectoryMC :: ModuleCollectionId -> Bool

@@ -66,6 +66,10 @@ library
                      , haskell-tools-backend-ghc
                      , haskell-tools-rewrite     >= 1.1  && < 1.2
                      , haskell-tools-prettyprint >= 1.1  && < 1.2
+                     , strict
+                     , pretty
+                     , Diff
+                     , extra
   default-language:    Haskell2010
 
 test-suite haskell-tools-builtin-refactorings-test
@@ -98,4 +102,5 @@ test-suite haskell-tools-builtin-refactorings-test
                      -- libraries used by the examples
                      , old-time                  >= 1.1  && < 1.2
                      , polyparse                 >= 1.12 && < 1.13
+                     , strict
   default-language:    Haskell2010

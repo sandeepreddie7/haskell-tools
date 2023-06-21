@@ -77,6 +77,7 @@ library
                      , Language.Haskell.Tools.Refactor.Builtin.InlineBinding
                      , Language.Haskell.Tools.Refactor.Builtin.FloatOut
                      , Language.Haskell.Tools.Refactor.Builtin.GetMatches
+                     , Language.Haskell.Tools.Refactor.Builtin.LetRefactoring
                      , Language.Haskell.Tools.Refactor.Builtin.OrganizeExtensions
                      , Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Checkers
                      , Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.ExtMap
@@ -85,6 +86,15 @@ library
                      , Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.TraverseAST
                      , Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Instances.Checkable
                      , Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Instances.AppSelector
+                     , Language.Haskell.Tools.Debug
+                     , Language.Haskell.Tools.Debug.DebugGhcAST
+                     , Language.Haskell.Tools.Debug.Show
+                     , Language.Haskell.Tools.Debug.RangeDebug
+                     , Language.Haskell.Tools.Debug.RangeDebugInstances
+                     , Language.Haskell.Tools.Refactor.Builtin.ShowTree
+                     , Language.Haskell.Tools.Refactor.Builtin.ChangeMonad
+                     , Language.Haskell.Tools.Refactor.Builtin.WriteBack
+                     , Language.Haskell.Tools.Refactor.Builtin.Ref1
 
   other-modules:       Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Checkers.ArrowsChecker
                      , Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Checkers.BangPatternsChecker

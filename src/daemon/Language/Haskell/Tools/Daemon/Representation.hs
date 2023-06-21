@@ -73,11 +73,11 @@ instance Show k => Show (ModuleCollection k) where
     = "ModuleCollection (" ++ show id ++ ") " ++ show loaded ++ " " ++ root ++ " " ++ show srcDirs ++ " " ++ show mapping
         ++ " (" ++ show mods ++ ") " ++ show deps
 
-makeReferences ''ModuleCollection
-makeReferences ''ModuleRecord
+-- makeReferences ''ModuleCollection
+-- makeReferences ''ModuleRecord
 
 instance Show ModuleRecord where
   show (ModuleNotLoaded code exposed) = "ModuleNotLoaded " ++ show code ++ " " ++ show exposed
-  show mr@(ModuleParsed {}) = "ModuleParsed (" ++ (GHC.moduleNameString $ GHC.moduleName $ GHC.ms_mod $ fromJust $ mr ^? modRecMS) ++ ")"
-  show mr@(ModuleRenamed {}) = "ModuleRenamed (" ++ (GHC.moduleNameString $ GHC.moduleName $ GHC.ms_mod $ fromJust $ mr ^? modRecMS) ++ ")"
-  show mr@(ModuleTypeChecked {}) = "ModuleTypeChecked (" ++ (GHC.moduleNameString $ GHC.moduleName $ GHC.ms_mod $ fromJust $ mr ^? modRecMS) ++ ")"
+  show mr@(ModuleParsed {}) = "ModuleParsed (" ++ (GHC.moduleNameString $ GHC.moduleName $ GHC.ms_mod $ _modRecMS mr) ++ ")"
+  show mr@(ModuleRenamed {}) = "ModuleRenamed (" ++ (GHC.moduleNameString $ GHC.moduleName $ GHC.ms_mod $ _modRecMS mr) ++ ")"
+  show mr@(ModuleTypeChecked {}) = "ModuleTypeChecked (" ++ (GHC.moduleNameString $ GHC.moduleName $ GHC.ms_mod $ _modRecMS mr) ++ ")"
