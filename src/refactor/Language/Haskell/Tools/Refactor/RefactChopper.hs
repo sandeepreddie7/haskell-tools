@@ -7,7 +7,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.Haskell.Tools.Refactor.Builtin.ShowTree where
+module Language.Haskell.Tools.Refactor.RefactChopper where
 
 import Language.Haskell.Tools.Refactor as Refactor hiding (LambdaCase)
 import Language.Haskell.Tools.Refactor.Utils.Extensions
@@ -48,7 +48,7 @@ import Language.Haskell.Tools.BackendGHC.Names
 import Language.Haskell.Tools.BackendGHC.Patterns (trfPattern)
 import Language.Haskell.Tools.BackendGHC.Types (trfType)
 
-import Language.Haskell.Tools.AST (Ann, AnnMaybeG, AnnListG, Dom, RangeStage)
+import Language.Haskell.Tools.AST 
 import qualified Language.Haskell.Tools.AST as AST
 
 import Control.Monad.IO.Class
@@ -57,7 +57,12 @@ import Language.Haskell.Tools.Refactor
 import Language.Haskell.Tools.Debug.RangeDebug
 import Language.Haskell.Tools.Debug.RangeDebugInstances
 import Control.Monad.IO.Class
-import Language.Haskell.Tools.Refactor.ChopperFile 
+import Language.Haskell.Tools.Refactor.ChopperFile
+import GHC.Paths ( libdir )
+import Data.Generics.Uniplate.Data ()
+import  Language.Haskell.Tools.Rewrite.Match.Exprs
+import Language.Haskell.Tools.Refactor
+
 
 
 -- NOTE: When working on the entire AST, we should build a monad,
@@ -66,23 +71,20 @@ import Language.Haskell.Tools.Refactor.ChopperFile
 
 --       Pretty easy now. Chcek wheter it is already in the ExtMap.
 
-showAstTree :: RefactoringChoice
-showAstTree = ModuleRefactoring "writeBack" (localRefactoring writeBack)
 
-
-writeBack :: LocalRefactoring
-writeBack ast =
+writeBack =
         do
-            moduleAST <- liftIO $ moduleParser "/home/chaitanya/Desktop/work/euler-api-txns/euler-x/src-generated/ConfigFramework/Storage/ConfigMeta.hs" "ConfigFramework.Storage.ConfigMeta"
-            !newAST <- liftGhc $ (!~) (biplateRef) (logicFn) (moduleAST)
-            liftIO $ writeFile "Shims.hs" (prettyPrint newAST)
-            return ast
+            moduleAST <- moduleParser "/home/chaitanya/Desktop/work/euler-api-txns/euler-x/src-generated/ConfigFramework/Storage/ConfigMeta.hs" "ConfigFramework.Storage.ConfigMeta"
+            !newAST <- (!~) (biplateRef) (logicFn) (moduleAST)
+            -- pure ()
+            writeFile "/home/chaitanya/Desktop/work/euler-api-txns/euler-x/src-generated/ConfigFramework/Storage/ConfigMeta.hs" (prettyPrint newAST)
+            
 
-check :: Decl -> Bool 
-check (InstanceDecl (InstanceRule _ _ (AppInstanceHead fn _)) _) =
-                                                let (x :: [String]) = fn ^? biplateRef
-                                                in not $ any (\x -> x == "HasField") x    
-check _ = True
+-- check :: Decl -> Bool 
+-- check (InstanceDecl (InstanceRule _ _ (AppInstanceHead fn _)) _) =
+--                                                 let (x :: [String]) = fn ^? biplateRef
+--                                                 in not $ any (\x -> x == "HasField") x    
+-- check _ = True
 
 -- UApp {_exprFun = UApp {_exprFun = UExplTypeApp {_exprInner = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [UNamePart {_simpleNameStr = "GHC"},UNamePart {_simpleNameStr = "Records"},UNamePart {_simpleNameStr = "Extra"}], _unqualifiedName = UNamePart {_simpleNameStr = "setField"}}}},
 --                                                               _exprType = UTyPromoted {_tpPromoted = UPromotedString {_promotedStringValue = "name"}}}, 
@@ -99,30 +101,29 @@ check _ = True
 --                                                               _valBindLocals = Nothing}}],
 --       _exprInner = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "dingding"}}}}}
 
-logicFn :: Expr -> Ghc Expr 
--- logicFn expr@(App (Var arg) ex@x) = do
---   let fnName  = trace (showName arg) showName arg 
---       pat = mkVarPat $ mkName "a"
---   let app = mkApp (mkVar $ mkName "encodeDecodeTransform") ex
---       updatedRhs = mkUnguardedRhs app
---       lclbnd = mkLocalValBind $ mkSimpleBind pat updatedRhs Nothing 
---       var = mkVar $ mkName "a"
---       letExpr = mkLet [lclbnd] var
---   if fnName == "encodeDecodeTransform"
---     then return letExpr
---     else return expr
-logicFn expr@(App (App (Var arg) (Var arg1)) ex@x) = do
-  let fnName  = trace (showName arg) showName arg1 
-      pat = mkVarPat $ mkName "a"
-      updatedRhs = mkUnguardedRhs expr
-      lclbnd = mkLocalValBind $ mkSimpleBind pat updatedRhs Nothing 
-      var = mkVar $ mkName "a"
-      letExpr = mkLet [lclbnd] var
-  if fnName == "encodeDecodeTransform"
-    then return letExpr
-    else return expr
+-- UApp {_exprFun = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [UNamePart {_simpleNameStr = "Se"}], _unqualifiedName = UNamePart {_simpleNameStr = "Eq"}}}}, _exprArg = UParen {_exprInner = UApp {_exprFun = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "encodeDecodeTransform"}}}}, _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "name"}}}}}}}
 
-logicFn x = trace ("Extra setFiled " ++ show x) $ return x
+-- UApp {_exprFun = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "encodeDecodeTransform"}}}},
+--       _exprArg = UVar {_exprName = UNormalName {_simpleName = UQualifiedName {_qualifiers = [], _unqualifiedName = UNamePart {_simpleNameStr = "name"}}}}}
+logicFn :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr ((Dom GhcPs)) SrcTemplateStage )
+-- logicFn expr@((App' (Var' arg) (Var' arg1))) = do
+--   liftIO $ print expr
+--   let fnName  = trace (showName' arg) showName' arg 
+--       pat = mkVarPat' $ mkName' "a"
+--       updatedRhs = mkUnguardedRhs' expr
+--       lclbnd = mkLocalValBind' $ mkSimpleBinds pat updatedRhs Nothing 
+--       var = mkVar' $ mkName' "a"
+--       letExpr = mkLet' [lclbnd] var
+--   print letExpr
+--   print fnName
+--   if fnName == "encodeDecodeTransform"
+--     then do
+--         print "yes"
+--         return letExpr
+--     else return expr
+logicFn expr = do
+    print expr
+    (pure expr)
 -- logicFn expr@(Let (LocalBinds [(SimpleBind _ (UnguardedRhs (Paren (App (Var arg1) (Var arg2)))) _ )]) (Var arg)) = do
 --     let !y1 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg)) $ showName arg
 --     let !y2 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg1)) $ showName arg
@@ -146,4 +147,3 @@ logicFn x = trace ("Extra setFiled " ++ show x) $ return x
 --     let !y1 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg)) $ showName arg
 --     let !y2 = trace ("Extra getFiled 1" ++ (showSDocUnsafe $ ppr $ idType $ semanticsId arg1)) $ showName arg
 --     return expr
-logicFn x = return x

@@ -10,7 +10,7 @@ import Data.String (IsString(..))
 import Language.Haskell.Tools.AST
 import Language.Haskell.Tools.PrettyPrint.Prepare
 import Language.Haskell.Tools.Rewrite.Create.Patterns (mkVarPat)
-import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe)
+import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe, mkAnn', mkAnnMaybe')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
 -- | A simplified function to generate simple value bindings without local definitions, guards or complex lhs.
@@ -20,6 +20,9 @@ mkSimpleBind' n e = mkSimpleBind (mkVarPat n) (mkUnguardedRhs e) Nothing
 -- | Creates a value binding (@ v = "12" @).
 mkSimpleBind :: Pattern -> Rhs -> Maybe LocalBinds -> ValueBind
 mkSimpleBind p r l = mkAnn (child <> child <> child) (USimpleBind p r (mkAnnMaybe opt l))
+
+mkSimpleBinds :: Pattern' -> Rhs' -> Maybe LocalBinds' -> ValueBind'
+mkSimpleBinds p r l = mkAnn' (child <> child <> child) (USimpleBind p r (mkAnnMaybe' opt l))
 
 -- | Creates a function binding (@ f 0 = 1; f x = x @). All matches must have the same name.
 mkFunctionBind :: [Match] -> ValueBind
@@ -56,6 +59,9 @@ mkLocalBinds' = mkAnn (" where " <> child) . ULocalBinds . mkAnnList (indented l
 mkLocalValBind :: ValueBind -> LocalBind
 mkLocalValBind = mkAnn child . ULocalValBind
 
+mkLocalValBind' :: ValueBind' -> LocalBind'
+mkLocalValBind' = mkAnn' child . ULocalValBind
+
 -- | Creates a local type signature
 mkLocalTypeSig :: TypeSignature -> LocalBind
 mkLocalTypeSig = mkAnn child . ULocalSignature
@@ -86,6 +92,9 @@ mkInfix prec op = mkAnn (child <> " " <> child <> " " <> child)
 -- | Creates an unguarded right-hand-side (@ = 3 @)
 mkUnguardedRhs :: Expr -> Rhs
 mkUnguardedRhs = mkAnn (" = " <> child) . UUnguardedRhs
+
+mkUnguardedRhs' :: Expr' -> Rhs'
+mkUnguardedRhs' = mkAnn' (" = " <> child) . UUnguardedRhs
 
 -- | Creates an unguarded right-hand-side (@ | x == 1 = 3; | otherwise = 4 @)
 mkGuardedRhss :: [GuardedRhs] -> Rhs

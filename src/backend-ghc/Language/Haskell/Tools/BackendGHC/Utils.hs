@@ -45,16 +45,15 @@ import Language.Haskell.Tools.BackendGHC.SourceMap
 
 createModuleInfo :: ModSummary -> SrcSpan -> [LImportDecl n] -> Trf (Sema.ModuleInfo GhcRn)
 createModuleInfo mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) = do
-  let prelude = (xopt ImplicitPrelude $ ms_hspp_opts mod)
-                  && all (\idecl -> ("Prelude" /= (GHC.moduleNameString $ unLoc $ ideclName $ unLoc idecl))
-                                      || nameLoc == getLoc idecl) imports
-  (_, preludeImports) <- if prelude then getImportedNames "Prelude" Nothing else return (ms_mod mod, [])
-  deps <- if prelude then lift $ getDeps (Module baseUnitId (GHC.mkModuleName "Prelude"))
-                     else return []
+  -- let prelude = (xopt ImplicitPrelude $ ms_hspp_opts mod)
+  --                 && all (\idecl -> ("Prelude" /= (GHC.moduleNameString $ unLoc $ ideclName $ unLoc idecl))
+  --                                     || nameLoc == getLoc idecl) imports
+  -- -- (_, preludeImports) <- if prelude then getImportedNames "Prelude" Nothing else return (ms_mod mod, [])
+  -- deps <- if prelude then return []
+  --                    else return []
   -- This function (via getInstances) refers the ghc environment,
   -- we must evaluate the result or the reference may be kept preventing garbage collection.
-  return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True)
-                        (forceElements preludeImports) deps
+  return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True) [] []
 
 -- | Creates a semantic information for a name
 createNameInfo :: IdP n -> Trf (NameInfo n)
@@ -86,42 +85,42 @@ createImplicitFldInfo select flds = return (mkImplicitFieldInfo (map getLabelAnd
 createImportData :: forall r n . (GHCName r, HsHasName (IdP n)) => GHC.ImportDecl n -> Trf (ImportInfo r)
 createImportData (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
   do (mod,importedNames) <- getImportedNames (GHC.moduleNameString $ unLoc name) (fmap (unpackFS . sl_fs) pkg)
-     names <- liftGhc $ filterM (checkImportVisible declHiding . (^. pName)) importedNames
-     -- TODO: only use getFromNameUsing once
-     lookedUpNames <- liftGhc $ mapM translatePName $ names
-     lookedUpImported <- liftGhc $ mapM ((getFromNameUsing @r) getTopLevelId . (^. pName)) $ importedNames
-     deps <- lift $ getDeps mod
+  --    names <- liftGhc $ filterM (checkImportVisible declHiding . (^. pName)) importedNames
+  --    -- TODO: only use getFromNameUsing once
+  --    lookedUpNames <- liftGhc $ mapM translatePName $ names
+  --    lookedUpImported <- liftGhc $ mapM ((getFromNameUsing @r) getTopLevelId . (^. pName)) $ importedNames
+  --    deps <- lift $ getDeps mod
      -- This function (via getInstances) refers the ghc environment,
      -- we must evaluate the result or the reference may be kept preventing garbage collection.
-     return $ mkImportInfo mod (forceElements $ catMaybes lookedUpImported)
-                               (forceElements $ catMaybes lookedUpNames)
-                               deps
-  where translatePName :: PName GhcRn -> Ghc (Maybe (PName r))
-        translatePName (PName n p) = do n' <- (getFromNameUsing @r) getTopLevelId n
-                                        p' <- maybe (return Nothing) ((getFromNameUsing @r) getTopLevelId) p
-                                        return (PName <$> n' <*> Just p')
+     return $ mkImportInfo mod []
+                               []
+                               []
+  -- where translatePName :: PName GhcRn -> Ghc (Maybe (PName r))
+  --       translatePName (PName n p) = do n' <- (getFromNameUsing @r) getTopLevelId n
+  --                                       p' <- maybe (return Nothing) ((getFromNameUsing @r) getTopLevelId) p
+  --                                       return (PName <$> n' <*> Just p')
 
 getDeps :: Module -> Ghc [Module]
-getDeps mod = do
-  env <- GHC.getSession
-  eps <- liftIO $ hscEPS env
-  case lookupIfaceByModule (hsc_dflags env) (hsc_HPT env) (eps_PIT eps) mod of
-    Just ifc -> (mod :) <$> mapM (liftIO . getModule env . fst) (dep_mods (mi_deps ifc))
-    Nothing -> return [mod]
-  where getModule env modName = do
-          res <- findHomeModule env modName
-          case res of Found _ m -> return m
-                      _ -> case lookupPluginModuleWithSuggestions (hsc_dflags env) modName Nothing of
-                             LookupFound m _ -> return m
-                             LookupHidden hiddenPack hiddenMod -> return (head $ map fst hiddenMod ++ map fst hiddenPack)
-                             _ -> error $ "getDeps: module not found: " ++ GHC.moduleNameString modName
+getDeps mod = pure []
+  -- env <- GHC.getSession
+  -- eps <- liftIO $ hscEPS env
+  -- case lookupIfaceByModule (hsc_dflags env) (hsc_HPT env) (eps_PIT eps) mod of
+  --   Just ifc -> (mod :) <$> mapM (liftIO . getModule env . fst) (dep_mods (mi_deps ifc))
+  --   Nothing -> return [mod]
+  -- where getModule env modName = do
+  --         res <- findHomeModule env modName
+  --         case res of Found _ m -> return m
+  --                     _ -> case lookupPluginModuleWithSuggestions (hsc_dflags env) modName Nothing of
+  --                            LookupFound m _ -> return m
+  --                            LookupHidden hiddenPack hiddenMod -> return (head $ map fst hiddenMod ++ map fst hiddenPack)
+  --                            _ -> return mod
 
 -- | Get names that are imported from a given import
 getImportedNames :: String -> Maybe String -> Trf (GHC.Module, [PName GhcRn])
 getImportedNames name pkg = liftGhc $ do
   hpt <- hsc_HPT <$> getSession
   eps <- getSession >>= liftIO . readIORef . hsc_EPS
-  mod <- findModule (mkModuleName name) (fmap mkFastString pkg)
+  mod <- pure $ GHC.Module (stringToUnitId "") (mkModuleName "") -- findModule (mkModuleName name) (fmap mkFastString pkg)
   -- load exported names from interface file
   let ifaceNames = maybe [] mi_exports $ flip lookupModuleEnv mod
                                        $ eps_PIT eps
@@ -170,6 +169,9 @@ nothing bef aft pos = annNothing . noSemaInfo . OptionalPos bef aft <$> pos
 
 emptyList :: String -> Trf SrcLoc -> Trf (AnnListG e (Dom n) RangeStage)
 emptyList sep ann = AnnListG <$> (noSemaInfo . ListPos "" "" sep Nothing <$> ann) <*> pure []
+
+emptyList' :: String -> Trf SrcLoc -> Trf (AnnListG e (Dom GhcPs) RangeStage)
+emptyList' sep ann = AnnListG <$> (noSemaInfo . ListPos "" "" sep Nothing <$> ann) <*> pure []
 
 -- | Creates a place for a list of nodes with a default place if the list is empty.
 makeList :: String -> Trf SrcLoc -> Trf [Ann e (Dom n) RangeStage] -> Trf (AnnListG e (Dom n) RangeStage)

@@ -1,6 +1,7 @@
 module Language.Haskell.Tools.Rewrite.ElementTypes where
 
 import Language.Haskell.Tools.AST
+import GHC
 
 type AnnList node = AnnListG node IdDom SrcTemplateStage
 type AnnMaybe node = AnnMaybeG node IdDom SrcTemplateStage
@@ -188,6 +189,7 @@ type PhaseControl = Ann UPhaseControl IdDom SrcTemplateStage
 
 -- | Value binding for top-level and local bindings
 type ValueBind = Ann UValueBind IdDom SrcTemplateStage
+type ValueBind' = Ann UValueBind (Dom GhcPs) SrcTemplateStage
 
 -- | Clause of function binding
 type Match = Ann UMatch IdDom SrcTemplateStage
@@ -197,6 +199,8 @@ type MatchLhs = Ann UMatchLhs IdDom SrcTemplateStage
 
 -- | Right hand side of a value binding (possible with guards): (@ = 3 @ or @ | x == 1 = 3; | otherwise = 4 @)
 type Rhs = Ann URhs IdDom SrcTemplateStage
+type Rhs' = Ann URhs (Dom GhcPs) SrcTemplateStage
+
 
 -- | A guarded right-hand side of a value binding (@ | x > 3 = 2 @)
 type GuardedRhs = Ann UGuardedRhs IdDom SrcTemplateStage
@@ -206,9 +210,12 @@ type RhsGuard = Ann URhsGuard IdDom SrcTemplateStage
 
 -- | Bindings that are enabled in local blocks (where or let).
 type LocalBind = Ann ULocalBind IdDom SrcTemplateStage
+type LocalBind' = Ann ULocalBind (Dom GhcPs) SrcTemplateStage
+
 
 -- | Local bindings attached to a declaration (@ where x = 42 @)
 type LocalBinds = Ann ULocalBinds IdDom SrcTemplateStage
+type LocalBinds' = Ann ULocalBinds (Dom GhcPs)  SrcTemplateStage
 
 -- | A fixity signature (@ infixl 5 +, - @).
 type FixitySignature = Ann UFixitySignature IdDom SrcTemplateStage
@@ -245,6 +252,8 @@ type PromotedKind = Ann (UPromoted UKind) IdDom SrcTemplateStage
 
 -- | Haskell expressions
 type Expr = Ann UExpr IdDom SrcTemplateStage
+type Expr' = Ann UExpr (Dom GhcPs) SrcTemplateStage
+
 
 -- | Clause of case expression (@ Just x -> x + 1 @)
 type Alt = Ann UAlt IdDom SrcTemplateStage
@@ -294,6 +303,8 @@ type CmdStmt = Ann UCmdStmt IdDom SrcTemplateStage
 
 -- | Representation of patterns for pattern bindings
 type Pattern = Ann UPattern IdDom SrcTemplateStage
+type Pattern' = Ann UPattern (Dom GhcPs) SrcTemplateStage
+
 
 -- Field specification of a record pattern
 type PatternField = Ann UPatternField IdDom SrcTemplateStage
@@ -321,13 +332,17 @@ type Operator = Ann UOperator IdDom SrcTemplateStage
 
 -- | A definition that functions as a name
 type Name = Ann UName IdDom SrcTemplateStage
+type Name' = Ann UName (Dom GhcPs) SrcTemplateStage
+
 
 -- | Possible qualified names. Contains also implicit names.
 -- Linear implicit parameter: @%x@. Non-linear implicit parameter: @?x@.
 type QualifiedName = Ann UQualifiedName IdDom SrcTemplateStage
+type QualifiedName' = Ann UQualifiedName (Dom GhcPs) SrcTemplateStage
 
 -- | Parts of a qualified name.
 type NamePart = Ann UNamePart IdDom SrcTemplateStage
+type NamePart' = Ann UNamePart (Dom GhcPs)  SrcTemplateStage
 
 -- | Program elements formatted as string literals (import packages, pragma texts)
 type StringNode = Ann UStringNode IdDom SrcTemplateStage
