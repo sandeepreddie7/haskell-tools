@@ -20,8 +20,14 @@ emptyList' = AnnListG (fromTemplate list) []
 justVal :: Ann e IdDom SrcTemplateStage -> AnnMaybe e
 justVal e = AnnMaybeG (fromTemplate opt) (Just e)
 
+justVal' :: Ann e (Dom GhcPs) SrcTemplateStage -> AnnMaybeG e (Dom GhcPs) SrcTemplateStage 
+justVal' e = AnnMaybeG (fromTemplate opt) (Just e)
+
 noth :: AnnMaybe e
 noth = AnnMaybeG (fromTemplate opt) Nothing
+
+noth' :: AnnMaybeG e (Dom GhcPs) SrcTemplateStage 
+noth' = AnnMaybeG (fromTemplate opt) Nothing
 
 mkAnn :: SpanInfo SrcTemplateStage -> e IdDom SrcTemplateStage -> Ann e IdDom SrcTemplateStage
 mkAnn temp = Ann (fromTemplate temp)

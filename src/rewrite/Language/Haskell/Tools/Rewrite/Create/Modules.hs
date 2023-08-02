@@ -9,7 +9,7 @@ module Language.Haskell.Tools.Rewrite.Create.Modules where
 import Data.String (IsString(..), String)
 import Language.Haskell.Tools.AST
 import Language.Haskell.Tools.PrettyPrint.Prepare
-import Language.Haskell.Tools.Rewrite.Create.Names (mkStringNode)
+import Language.Haskell.Tools.Rewrite.Create.Names (mkStringNode, mkStringNode')
 import Language.Haskell.Tools.Rewrite.Create.Utils
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
@@ -25,6 +25,10 @@ mkModule filePrags head imps decls
 mkModuleHead :: ModuleName -> Maybe ModulePragma -> Maybe ExportSpecs -> ModuleHead
 mkModuleHead n pr es = mkAnn ("module " <> child <> child <> child <> " where")
                          $ UModuleHead n (mkAnnMaybe (after "\n" opt) pr) (mkAnnMaybe opt es)
+
+mkModuleHead' :: ModuleName' -> Maybe ModulePragma' -> Maybe ExportSpecs' -> ModuleHead'
+mkModuleHead' n pr es = mkAnn' ("module " <> child <> child <> child <> " where")
+                         $ UModuleHead n (mkAnnMaybe' (after "\n" opt) pr) (mkAnnMaybe' opt es)
 
 -- | A list of export specifications surrounded by parentheses
 mkExportSpecs :: [ExportSpec] -> ExportSpecs
@@ -65,6 +69,17 @@ mkImportDecl source qualified safe pkg name rename spec
                   (case pkg of Just str -> justVal (mkStringNode str); _ -> noth)
                   name (mkAnnMaybe opt (fmap (mkAnn (" as " <> child) . UImportRenaming) rename)) (mkAnnMaybe opt spec)
 
+mkImportDecl' :: Bool -> Bool -> Bool -> Maybe String -> ModuleName' -> Maybe ModuleName' -> Maybe ImportSpec'
+                  -> ImportDecl'
+mkImportDecl' source qualified safe pkg name rename spec
+  = mkAnn' ("import " <> child <> child <> child <> child <> child <> child <> child) $
+      UImportDecl (if source then justVal' (mkAnn' "{-# SOURCE #-} " UImportSource) else noth')
+                  (if qualified then justVal' (mkAnn' "qualified " UImportQualified) else noth')
+                  (if safe then justVal' (mkAnn' "safe " UImportSafe) else noth')
+                  (case pkg of Just str -> justVal' (mkStringNode' str); _ -> noth')
+                  name (mkAnnMaybe' opt (fmap (mkAnn' (" as " <> child) . UImportRenaming) rename)) (mkAnnMaybe' opt spec)
+
+
 -- | Restrict the import definition to ONLY import the listed names
 mkImportSpecList :: [IESpec] -> ImportSpec
 mkImportSpecList = mkAnn ("(" <> child <> ")") . UImportSpecList . mkAnnList (separatedBy ", " list)
@@ -76,6 +91,9 @@ mkImportHidingList = mkAnn (" hiding (" <> child <> ")") . UImportSpecHiding . m
 -- | The name of a module
 mkModuleName :: String -> ModuleName
 mkModuleName s = mkAnn (fromString s) (UModuleName s)
+
+mkModuleName' :: String -> ModuleName'
+mkModuleName' s = mkAnn' (fromString s) (UModuleName s)
 
 -- * Pragmas
 

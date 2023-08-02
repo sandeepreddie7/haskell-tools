@@ -42,14 +42,14 @@ trfModule :: ModSummary -> Located (HsModule GhcPs) -> Trf (Ann AST.UModule (Dom
 trfModule mod hsMod = do
   -- createModuleInfo involves reading the ghc compiler state, so it must be evaluated
   -- or large parts of the representation will be kept
-  !modInfo <- createModuleInfo mod (maybe noSrcSpan getLoc $ hsmodName $ unLoc hsMod) 
-  trfLocCorrect (pure mkNoSemanticInfo)
+  !modInfo <- createModuleInfo mod (maybe noSrcSpan getLoc $ hsmodName $ unLoc hsMod) (hsmodImports $ unLoc hsMod)
+  trfLocCorrect (pure modInfo)
      (\sr -> combineSrcSpans sr <$> (uniqueTokenAnywhere AnnEofPos))
      (\(HsModule name exports imports decls deprec _) ->
         AST.UModule <$> trfFilePragmas
                     <*> (trfModuleHead name (srcSpanStart (foldLocs (map getLoc imports ++ map getLoc decls))) exports deprec)
                     <*> (trfImports imports)
-                    <*> (trfDecls decls)) $ hsMod
+                    <*>  (trfDecls decls)) $ hsMod
 
 -- | Transformes the module in its typed state. Uses the results of 'trfModule' to extract program
 -- elements (splices for example) that are not kept in the typed representation.

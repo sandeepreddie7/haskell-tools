@@ -94,3 +94,6 @@ mkSimpleName'' n = mkAnn' (child <> child)
 -- | Creates a quoted text
 mkStringNode :: String -> StringNode
 mkStringNode s = mkAnn (fromString s) (UStringNode s)
+
+mkStringNode' :: String -> StringNode'
+mkStringNode' s = mkAnn' (fromString s) (UStringNode s)
