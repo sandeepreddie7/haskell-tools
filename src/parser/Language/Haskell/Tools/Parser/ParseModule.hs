@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts, TypeFamilies #-}
-module Language.Haskell.Tools.Refactor.ChopperFile where
+module Language.Haskell.Tools.Parser.ParseModule where
   
 -- import Retrie
 import Debug.Trace
@@ -217,10 +217,10 @@ moduleParser modulePath moduleName = do
     print $ showSDocUnsafe $ ppr modSum
     y <- runGhc (Just libdir) $ parseModule modSum
     let annots = pm_annotations y
-    valsss <- runGhc (Just libdir) $ runTrf (fst annots) (getPragmaComments $ snd annots) $ trfModule modSum (pm_parsed_source y)
+    valsss <- runGhc (Just libdir) $ runTrf (fst annots) (getPragmaComments $ snd annots) $ trfModule' modSum (pm_parsed_source y)
     sourceOrigin <- return (fromJust $ ms_hspp_buf $ pm_mod_summary y)
     newAst <- runGhc (Just libdir) $ (prepareAST) sourceOrigin . placeComments (fst annots) (getNormalComments $ snd annots)
-        <$> (runTrf (fst annots) (getPragmaComments $ snd annots) $ trfModule modSum $ pm_parsed_source y)
+        <$> (runTrf (fst annots) (getPragmaComments $ snd annots) $ trfModule' modSum $ pm_parsed_source y)
     -- print valsss
     --   srcBuffer <- if hasCppExtension
     --                 then liftIO $ hGetStringBuffer (getModSumOrig ms)

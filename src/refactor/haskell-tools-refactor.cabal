@@ -47,8 +47,6 @@ library
                      , Language.Haskell.Tools.Refactor.Utils.NameLookup
                      , Language.Haskell.Tools.Refactor.Utils.TypeLookup
                      , Language.Haskell.Tools.Refactor.Querying
-                     , Language.Haskell.Tools.Refactor.ChopperFile
-                     , Language.Haskell.Tools.Refactor.RefactChopper
 
   build-depends:       base                       
                      , aeson                     >= 1.0  && < 1.5
@@ -68,7 +66,6 @@ library
                      , haskell-tools-backend-ghc
                      , haskell-tools-rewrite     >= 1.1  && < 1.2
                      , haskell-tools-prettyprint >= 1.1  && < 1.2
-                     , haskell-tools-debug
                      , strict
                      , pretty
                      , Diff

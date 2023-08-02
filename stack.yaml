@@ -19,6 +19,7 @@ packages:
   - src/cli
   - src/debug
   - src/daemon
+  - src/parser
 
 extra-deps:
   - git: https://github.com/Chaitanya-nair/classyplate.git
