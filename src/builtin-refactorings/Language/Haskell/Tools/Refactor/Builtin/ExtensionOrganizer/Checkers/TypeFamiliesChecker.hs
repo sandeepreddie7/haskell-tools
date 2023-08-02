@@ -5,6 +5,7 @@ import PrelNames      as GHC
 import Unique         as GHC (hasKey)
 import Var            as GHC (isId)
 import qualified Type as GHC (expandTypeSynonyms)
+import Name (isTyConName)
 
 import Control.Reference ((^.))
 
@@ -64,7 +65,7 @@ chkTypeFamiliesInstBodyDecl' b                             = return b
 chkOperatorForTypeEq' :: CheckNode Operator
 chkOperatorForTypeEq' op
   | Just name <- semanticsName (op ^. operatorName)
-  , name == eqTyConName
+  , isTyConName name
   = addRelation (TypeFamilies `lOr` GADTs) op
   | otherwise = return op
 

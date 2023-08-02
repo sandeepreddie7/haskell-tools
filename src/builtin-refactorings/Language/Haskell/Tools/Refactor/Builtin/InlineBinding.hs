@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, LiberalTypeSynonyms #-}
 
 -- | Defines the inline binding refactoring that removes a value binding and replaces all occurences
 -- with an expression equivalent to the body of the binding.

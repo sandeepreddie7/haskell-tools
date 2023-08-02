@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, LiberalTypeSynonyms #-}
 
 -- | The final version of the source annotation. Each node contains its original textual format, with the places of
 -- the children specified by placeholders.

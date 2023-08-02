@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, DataKinds #-}
 -- | Functions that convert the Template-Haskell-related elements of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.TH where
 
@@ -6,9 +6,9 @@ import Control.Monad.Reader (asks)
 
 import ApiAnnotation as GHC (AnnKeywordId(..))
 import FastString as GHC (unpackFS)
-import HsExpr as GHC (HsSplice(..), HsExpr(..), HsBracket(..))
+import GHC.Hs.Expr as GHC (HsSplice(..), HsExpr(..), HsBracket(..))
 import SrcLoc as GHC
-import HsExtension (GhcPass)
+import GHC.Hs.Extension
 
 import Language.Haskell.Tools.BackendGHC.Decls (trfDecls, trfDeclsGroup)
 import Language.Haskell.Tools.BackendGHC.Exprs (trfExpr, createScopeInfo)
@@ -21,7 +21,7 @@ import Language.Haskell.Tools.BackendGHC.Utils
 import Language.Haskell.Tools.AST (Ann, Dom, RangeStage)
 import qualified Language.Haskell.Tools.AST as AST
 
-trfQuasiQuotation' :: forall n r . TransformName n r => HsSplice n -> Trf (AST.UQuasiQuote (Dom r) RangeStage)
+trfQuasiQuotation' :: forall n r . TransformName n r => HsSplice (GhcPass n) -> Trf (AST.UQuasiQuote (Dom (GhcPass r)) RangeStage)
  -- the lexer does not provide us with tokens '[', '|' and '|]'
 trfQuasiQuotation' (HsQuasiQuote _ _ id l str)
   = AST.UQuasiQuote <$> annLocNoSema quoterLoc (trfName' @n id)
@@ -32,7 +32,7 @@ trfQuasiQuotation' (HsQuasiQuote _ _ id l str)
         strLoc = mkSrcSpan (srcSpanStart l) (updateCol (subtract 2) (srcSpanEnd l))
 trfQuasiQuotation' qq = unhandledElement "quasi quotation" qq
 
-trfSplice :: (TransformName n r, n ~ GhcPass p) => HsSplice n -> Trf (Ann AST.USplice (Dom r) RangeStage)
+trfSplice :: (TransformName n r) => HsSplice (GhcPass n) -> Trf (Ann AST.USplice (Dom (GhcPass r)) RangeStage)
 trfSplice spls = do rng <- asks contRange
                     annLocNoSema (pure $ getSpliceLoc spls `mappend` rng) (trfSplice' spls)
 
@@ -42,13 +42,13 @@ getSpliceLoc (HsUntypedSplice _ _ _ e) = getLoc e
 getSpliceLoc (HsQuasiQuote _ _ _ sp _) = sp
 getSpliceLoc (HsSpliced _ _ _) = noSrcSpan
 
-trfSplice' :: (TransformName n r, n ~ GhcPass p) => HsSplice n -> Trf (AST.USplice (Dom r) RangeStage)
+trfSplice' :: (TransformName n r) => HsSplice (GhcPass n) -> Trf (AST.USplice (Dom (GhcPass r)) RangeStage)
 trfSplice' (HsTypedSplice _ _ _ expr) = trfSpliceExpr expr
 trfSplice' (HsUntypedSplice _ _ _ expr) = trfSpliceExpr expr
 trfSplice' s = unhandledElement "splice" s
 
 -- | TODO: easier with splice decoration
-trfSpliceExpr :: forall n r p . (TransformName n r, n ~ GhcPass p) => Located (HsExpr n) -> Trf (AST.USplice (Dom r) RangeStage)
+trfSpliceExpr :: forall n r p . (TransformName n r) => Located (HsExpr (GhcPass n)) -> Trf (AST.USplice (Dom (GhcPass r)) RangeStage)
 trfSpliceExpr expr =
   do hasDollar <- allTokenLoc AnnThIdSplice
      hasDoubleDollar <- allTokenLoc AnnThIdTySplice
@@ -60,7 +60,7 @@ trfSpliceExpr expr =
                   L _ (HsRecFld _ fldName) -> AST.UIdSplice <$> trfAmbiguousFieldName' newSp fldName
                   expr -> AST.UParenSplice <$> trfExpr expr
 
-trfBracket' :: forall n r p . (TransformName n r, n ~ GhcPass p) => HsBracket n -> Trf (AST.UBracket (Dom r) RangeStage)
+trfBracket' :: forall n r . (TransformName n r) => HsBracket (GhcPass n) -> Trf (AST.UBracket (Dom (GhcPass r)) RangeStage)
 trfBracket' (ExpBr _ expr) = AST.UExprBracket <$> trfExpr expr
 trfBracket' (TExpBr _ expr) = AST.UExprBracket <$> trfExpr expr
 trfBracket' (VarBr _ isSingle expr)

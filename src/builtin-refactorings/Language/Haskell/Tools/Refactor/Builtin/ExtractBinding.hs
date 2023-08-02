@@ -4,7 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, LiberalTypeSynonyms #-}
 
 module Language.Haskell.Tools.Refactor.Builtin.ExtractBinding
   (extractBinding', extractBindingRefactoring) where

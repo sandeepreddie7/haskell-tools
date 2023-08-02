@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, DataKinds, PartialTypeSignatures #-}
 
 -- | Functions that convert the value and function definitions of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.Binds where
@@ -12,14 +12,14 @@ module Language.Haskell.Tools.BackendGHC.Binds where
 import ApiAnnotation as GHC (AnnKeywordId(..))
 import Bag as GHC (bagToList)
 import BasicTypes as GHC
-import HsBinds as GHC
-import HsExpr as GHC
-import HsPat as GHC (LPat)
-import HsTypes as GHC (SrcStrictness(..), HsWildCardBndrs(..), HsImplicitBndrs(..))
+import GHC.Hs.Binds as GHC
+import GHC.Hs.Expr as GHC
+import GHC.Hs.Pat as GHC (LPat)
+import GHC.Hs.Types as GHC (SrcStrictness(..), HsWildCardBndrs(..), HsImplicitBndrs(..))
 import Name as GHC (isSymOcc)
-import PlaceHolder as GHC (NameOrRdrName)
+import GHC.Hs.PlaceHolder as GHC (NameOrRdrName)
 import SrcLoc as GHC
-import HsExtension (GhcPass, IdP)
+import GHC.Hs.Extension
 
 import Control.Monad.Reader (Monad(..), mapM, asks)
 import Data.List
@@ -36,10 +36,10 @@ import Language.Haskell.Tools.BackendGHC.Utils
 import Language.Haskell.Tools.AST (Ann, AnnMaybeG, AnnListG, Dom, RangeStage)
 import qualified Language.Haskell.Tools.AST as AST
 
-trfBind :: (TransformName n r, n ~ GhcPass p) => Located (HsBind n) -> Trf (Ann AST.UValueBind (Dom r) RangeStage)
+trfBind :: (TransformName n r) => Located (HsBind (GhcPass n)) -> Trf (Ann AST.UValueBind (Dom (GhcPass r)) RangeStage)
 trfBind = trfLocNoSema trfBind'
 
-trfBind' :: forall n r p . (TransformName n r, n ~ GhcPass p) => HsBind n -> Trf (AST.UValueBind (Dom r) RangeStage)
+trfBind' :: forall n r p . (TransformName n r) => HsBind (GhcPass n) -> Trf (AST.UValueBind (Dom (GhcPass r)) RangeStage)
 -- A value binding with a strcitness annotation
 trfBind' (FunBind { fun_id = id, fun_matches = MG { mg_alts = L _ [L _ (Match { m_ctxt = FunRhs { mc_strictness = SrcStrict }, m_pats = [], m_grhss = GRHSs _ [L _ (GRHS _ [] expr)] (L _ locals) })]} })
   = do bangLoc <- focusBeforeLoc (srcSpanStart $ getLoc id) $ tokenLoc AnnBang
@@ -61,17 +61,17 @@ trfBind' (PatBind _ pat (GRHSs _ rhs (unLoc -> locals)) _)
 trfBind' (PatSynBind _ _) = convertionProblem "Pattern synonym bindings should be recognized on the declaration level"
 trfBind' b = unhandledElement "binding" b
 
-trfMatch :: (TransformName n r, n ~ GhcPass p) => IdP n -> Located (Match n (LHsExpr n)) -> Trf (Ann AST.UMatch (Dom r) RangeStage)
+trfMatch :: (TransformName n r) => IdP (GhcPass n) -> Located (Match (GhcPass n) (LHsExpr (GhcPass n))) -> Trf (Ann AST.UMatch (Dom (GhcPass r)) RangeStage)
 trfMatch id = trfLocNoSema (trfMatch' id)
 
-trfMatch' :: (TransformName n r, n ~ GhcPass p) => IdP n -> Match n (LHsExpr n) -> Trf (AST.UMatch (Dom r) RangeStage)
-trfMatch' name (Match _ funid pats (GRHSs _ rhss (unLoc -> locBinds)))
+trfMatch' :: (TransformName n r) => IdP (GhcPass n) -> Match (GhcPass n) (LHsExpr (GhcPass n)) -> Trf (AST.UMatch (Dom (GhcPass r)) RangeStage)
+trfMatch' name (Match _ funid pats (GRHSs _ rhss (unLoc -> locBinds))) =
   -- TODO: add the optional typ to pats
-  = AST.UMatch <$> trfMatchLhs name funid pats
+   AST.UMatch <$> trfMatchLhs name funid pats
                <*> addToScope pats (addToScope locBinds (trfRhss rhss))
                <*> addToScope pats (trfWhereLocalBinds (collectLocs rhss) locBinds)
 
-trfMatchLhs :: forall n r p . (TransformName n r, n ~ GhcPass p) => IdP n -> HsMatchContext (NameOrRdrName (IdP n)) -> [LPat n] -> Trf (Ann AST.UMatchLhs (Dom r) RangeStage)
+trfMatchLhs :: forall n r. (TransformName n r) => IdP (GhcPass n) -> HsMatchContext (NameOrRdrName (IdP (GhcPass n))) -> [LPat (GhcPass n)] -> Trf (Ann AST.UMatchLhs (Dom (GhcPass r)) RangeStage)
 trfMatchLhs name fb pats
   = do implicitIdLoc <- mkSrcSpan <$> atTheStart <*> atTheStart
        parenOpLoc <- tokensLoc [AnnOpenP, AnnVal, AnnCloseP]
@@ -92,39 +92,39 @@ trfMatchLhs name fb pats
            (left:right:rest, True) -> AST.UInfixLhs left <$> define (trfOperator @n n) <*> pure right <*> makeList " " (pure closeLoc) (pure rest)
            _                       -> AST.UNormalLhs <$> define (trfName @n n) <*> makeList " " (pure closeLoc) (pure args)
 
-trfRhss :: (TransformName n r, n ~ GhcPass p) => [Located (GRHS n (LHsExpr n))] -> Trf (Ann AST.URhs (Dom r) RangeStage)
+trfRhss :: (TransformName n r) => [Located (GRHS (GhcPass n) (LHsExpr (GhcPass n)))] -> Trf (Ann AST.URhs (Dom (GhcPass r)) RangeStage)
 -- the original location on the GRHS misleadingly contains the local bindings
 trfRhss [unLoc -> GRHS _ [] body] = annLocNoSema (combineSrcSpans (getLoc body) <$> tokenBefore (srcSpanStart $ getLoc body) AnnEqual)
                                                  (AST.UUnguardedRhs <$> trfExpr body)
 trfRhss rhss = annLocNoSema (pure $ collectLocs rhss)
                       (AST.UGuardedRhss . nonemptyAnnList <$> mapM trfGuardedRhs rhss)
 
-trfGuardedRhs :: (TransformName n r, n ~ GhcPass p) => Located (GRHS n (LHsExpr n)) -> Trf (Ann AST.UGuardedRhs (Dom r) RangeStage)
+trfGuardedRhs :: (TransformName n r) => Located (GRHS (GhcPass n) (LHsExpr (GhcPass n))) -> Trf (Ann AST.UGuardedRhs (Dom (GhcPass r)) RangeStage)
 trfGuardedRhs = trfLocNoSema $ \(GRHS _ guards body)
   -> AST.UGuardedRhs . nonemptyAnnList <$> trfScopedSequence trfRhsGuard guards <*> addToScope guards (trfExpr body)
 
-trfRhsGuard :: (TransformName n r, n ~ GhcPass p) => Located (Stmt n (LHsExpr n)) -> Trf (Ann AST.URhsGuard (Dom r) RangeStage)
+trfRhsGuard :: (TransformName n r) => Located (Stmt (GhcPass n) (LHsExpr (GhcPass n))) -> Trf (Ann AST.URhsGuard (Dom (GhcPass r)) RangeStage)
 trfRhsGuard = trfLocNoSema trfRhsGuard'
 
-trfRhsGuard' :: (TransformName n r, n ~ GhcPass p) => Stmt n (LHsExpr n) -> Trf (AST.URhsGuard (Dom r) RangeStage)
+trfRhsGuard' :: (TransformName n r) => Stmt (GhcPass n) (LHsExpr (GhcPass n)) -> Trf (AST.URhsGuard (Dom (GhcPass r)) RangeStage)
 trfRhsGuard' (BindStmt _ pat body _ _) = AST.UGuardBind <$> trfPattern pat <*> trfExpr body
 trfRhsGuard' (BodyStmt _ body _ _) = AST.UGuardCheck <$> trfExpr body
 trfRhsGuard' (LetStmt _ (unLoc -> binds)) = AST.UGuardLet <$> trfLocalBinds AnnLet binds
 trfRhsGuard' d = unhandledElement "guard" d
 
-trfWhereLocalBinds :: (TransformName n r, n ~ GhcPass p) => SrcSpan -> HsLocalBinds n -> Trf (AnnMaybeG AST.ULocalBinds (Dom r) RangeStage)
+trfWhereLocalBinds :: (TransformName n r) => SrcSpan -> HsLocalBinds (GhcPass n) -> Trf (AnnMaybeG AST.ULocalBinds (Dom (GhcPass r)) RangeStage)
 trfWhereLocalBinds _ (EmptyLocalBinds _) = nothing "" "" atTheEnd
 trfWhereLocalBinds bef binds
   = makeJust <$> annLocNoSema (combineSrcSpans (srcLocSpan (srcSpanEnd bef) `combineSrcSpans` getBindLocs binds) <$> tokenLocBack AnnWhere)
                               (AST.ULocalBinds <$> addToScope binds (trfLocalBinds AnnWhere binds))
 
-getBindLocs :: n ~ GhcPass p => HsLocalBinds n -> SrcSpan
+getBindLocs :: HsLocalBinds (GhcPass n) -> SrcSpan
 getBindLocs (HsValBinds _ (ValBinds _ binds sigs)) = foldLocs $ map getLoc (bagToList binds) ++ map getLoc sigs
 getBindLocs (HsValBinds _ (XValBindsLR (NValBinds binds sigs))) = foldLocs $ map getLoc (concatMap (bagToList . snd) binds) ++ map getLoc sigs
 getBindLocs (HsIPBinds _ (IPBinds _ binds)) = foldLocs $ map getLoc binds
 getBindLocs (EmptyLocalBinds _) = noSrcSpan
 
-trfLocalBinds :: (TransformName n r, n ~ GhcPass p) => AnnKeywordId -> HsLocalBinds n -> Trf (AnnListG AST.ULocalBind (Dom r) RangeStage)
+trfLocalBinds :: (TransformName n r) => AnnKeywordId -> HsLocalBinds (GhcPass n) -> Trf (AnnListG AST.ULocalBind (Dom (GhcPass r)) RangeStage)
 trfLocalBinds token (HsValBinds _ (ValBinds _ binds sigs))
   = makeIndentedListBefore " " (after token)
       (orderDefs <$> ((++) <$> mapM (copyAnnot AST.ULocalValBind . trfBind) (bagToList binds)
@@ -137,7 +137,7 @@ trfLocalBinds token (HsIPBinds _ (IPBinds _ binds))
   = makeIndentedListBefore " " (after token) (mapM trfIpBind binds)
 trfLocalBinds _ b = unhandledElement "local binds" b
 
-trfIpBind :: (TransformName n r, n ~ GhcPass p) => Located (IPBind n) -> Trf (Ann AST.ULocalBind (Dom r) RangeStage)
+trfIpBind :: (TransformName n r) => Located (IPBind (GhcPass n)) -> Trf (Ann AST.ULocalBind (Dom (GhcPass r)) RangeStage)
 trfIpBind = trfLocNoSema $ \case
   IPBind _ (Left (L l ipname)) expr
     -> AST.ULocalValBind
@@ -146,22 +146,22 @@ trfIpBind = trfLocNoSema $ \case
                                               <*> nothing " " "" atTheEnd)
   IPBind _ (Right _) _ -> convertionProblem "trfIpBind: called on typechecked AST"
 
-trfLocalSig :: forall n r p . (TransformName n r, n ~ GhcPass p) => Located (Sig n) -> Trf (Ann AST.ULocalBind (Dom r) RangeStage)
+trfLocalSig :: forall n r p . (TransformName n r) => Located (Sig (GhcPass n)) -> Trf (Ann AST.ULocalBind (Dom (GhcPass r)) RangeStage)
 trfLocalSig = trfLocNoSema $ \case
   ts@(TypeSig {}) -> AST.ULocalSignature <$> annContNoSema (trfTypeSig' ts)
   (FixSig _ fs) -> AST.ULocalFixity <$> annContNoSema (trfFixitySig fs)
   (InlineSig _ name prag) -> AST.ULocalInline <$> trfInlinePragma @n name prag
   d -> unhandledElement "local signature" d
 
-trfTypeSig :: (TransformName n r, n ~ GhcPass p) => Located (Sig n) -> Trf (Ann AST.UTypeSignature (Dom r) RangeStage)
+trfTypeSig :: (TransformName n r) => Located (Sig (GhcPass n)) -> Trf (Ann AST.UTypeSignature (Dom (GhcPass r)) RangeStage)
 trfTypeSig = trfLocNoSema trfTypeSig'
 
-trfTypeSig' :: forall n r p . (TransformName n r, n ~ GhcPass p) => Sig n -> Trf (AST.UTypeSignature (Dom r) RangeStage)
+trfTypeSig' :: forall n r p . (TransformName n r) => Sig (GhcPass n) -> Trf (AST.UTypeSignature (Dom (GhcPass r)) RangeStage)
 trfTypeSig' (TypeSig _ names typ)
   = defineTypeVars $ AST.UTypeSignature <$> makeNonemptyList ", " (mapM (trfName @n) names) <*> trfType (hsib_body $ hswc_body typ)
 trfTypeSig' ts = unhandledElement "type signature" ts
 
-trfFixitySig :: forall n r . TransformName n r => FixitySig n -> Trf (AST.UFixitySignature (Dom r) RangeStage)
+trfFixitySig :: forall n r . TransformName n r => FixitySig (GhcPass n) -> Trf (AST.UFixitySignature (Dom (GhcPass r)) RangeStage)
 trfFixitySig (FixitySig _ names (Fixity _ prec dir))
   = do precLoc <- tokenLoc AnnVal -- the precedence token or one of the names
        AST.UFixitySignature <$> transformDir dir
@@ -176,7 +176,7 @@ trfFixitySig (FixitySig _ names (Fixity _ prec dir))
 
         directionChar = annLocNoSema ((\l -> mkSrcSpan (updateCol (subtract 1) l) l) . srcSpanEnd <$> tokenLoc AnnInfix)
 
-trfInlinePragma :: forall n r . TransformName n r => Located (IdP n) -> InlinePragma -> Trf (Ann AST.UInlinePragma (Dom r) RangeStage)
+trfInlinePragma :: forall n r . TransformName n r => Located (IdP (GhcPass n)) -> InlinePragma -> Trf (Ann AST.UInlinePragma (Dom (GhcPass r)) RangeStage)
 trfInlinePragma name (InlinePragma _ Inlinable _ phase _)
   = annContNoSema (AST.UInlinablePragma <$> trfPhase (pure $ srcSpanStart $ getLoc name) phase <*> trfName @n name)
 trfInlinePragma name (InlinePragma _ NoInline _ _ _) = annContNoSema (AST.UNoInlinePragma <$> trfName @n name)
@@ -187,7 +187,7 @@ trfInlinePragma name (InlinePragma (fromSrcText -> src) Inline _ phase cl)
                                          <*> trfPhase (pure $ srcSpanStart (getLoc name)) phase
                                          <*> trfName @n name
 
-trfPhase :: Trf SrcLoc -> Activation -> Trf (AnnMaybeG AST.UPhaseControl (Dom r) RangeStage)
+trfPhase :: Trf SrcLoc -> Activation -> Trf (AnnMaybeG AST.UPhaseControl (Dom (GhcPass r)) RangeStage)
 trfPhase l AlwaysActive = nothing " " "" l
 trfPhase _ (ActiveAfter _ pn) = makeJust <$> annLocNoSema (combineSrcSpans <$> tokenLoc AnnOpenS <*> tokenLoc AnnCloseS)
                                                           (AST.UPhaseControl <$> nothing "" "" (before AnnCloseS) <*> (makeJust <$> trfPhaseNum pn))
@@ -196,10 +196,10 @@ trfPhase _ (ActiveBefore _ pn) = makeJust <$> annLocNoSema (combineSrcSpans <$> 
 trfPhase _ NeverActive = makeJust <$> annLocNoSema (combineSrcSpans <$> tokenLoc AnnOpenS <*> tokenLoc AnnCloseS)
                                                    (AST.UPhaseControl <$> (makeJust <$> annLocNoSema (tokenLoc AnnTilde) (pure AST.PhaseInvert)) <*> nothing " " "" (after AnnTilde))
 
-trfPhaseNum ::  PhaseNum -> Trf (Ann AST.PhaseNumber (Dom r) RangeStage)
+trfPhaseNum ::  PhaseNum -> Trf (Ann AST.PhaseNumber (Dom (GhcPass r)) RangeStage)
 trfPhaseNum i = annLocNoSema (tokenLoc AnnVal) $ pure (AST.PhaseNumber $ fromIntegral i)
 
-trfConlike :: [SrcSpan] -> RuleMatchInfo -> Trf (AnnMaybeG AST.UConlikeAnnot (Dom r) RangeStage)
+trfConlike :: [SrcSpan] -> RuleMatchInfo -> Trf (AnnMaybeG AST.UConlikeAnnot (Dom (GhcPass r)) RangeStage)
 trfConlike parts ConLike | length parts > 2
   = makeJust <$> annLocNoSema (pure $ parts !! 2) (pure AST.UConlikeAnnot)
   | otherwise = convertionProblem $ "trfConlike: expected 3 parts, got: " ++ show parts

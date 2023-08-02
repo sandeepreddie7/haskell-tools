@@ -1,5 +1,6 @@
 sandbox
-dist
+dist*
+.vscode
 .cabal-sandbox
 cabal.sandbox.config
 *.hi

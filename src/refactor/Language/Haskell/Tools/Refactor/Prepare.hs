@@ -13,11 +13,13 @@ import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Language.Haskell.TH.LanguageExtensions (Extension(..))
 import System.Directory (canonicalizePath)
 import System.FilePath
+import Outputable
 
 import CmdLineParser (CmdLineP(..), processArgs, Warn(..), Err(..))
 import DynFlags
 import FastString (mkFastString)
 import GHC hiding (loadModule, ModuleName)
+import Module (moduleNameFS, moduleNameString)
 import qualified GHC (loadModule)
 import GHC.Paths ( libdir )
 import GhcMonad
@@ -25,7 +27,12 @@ import HscTypes
 import Outputable (Outputable(..), showSDocUnsafe, cat, (<>))
 import Packages (initPackages)
 import SrcLoc
-import StringBuffer (hGetStringBuffer)
+import HscMain
+import StringBuffer (hGetStringBuffer, StringBuffer (..), lexemeToString)
+import System.IO
+import System.Directory
+import Data.List.Extra (replace, isInfixOf)
+
 
 import Language.Haskell.Tools.AST as AST
 import Language.Haskell.Tools.BackendGHC
@@ -45,7 +52,9 @@ tryRefactor refact moduleName span
   = runGhc (Just libdir) $ do
       initGhcFlags
       useDirs ["."]
-      mod <- loadModule "." moduleName >>= parseTyped
+      liftIO $ print "before refactor"
+      mod <- loadModule "." moduleName >>= parseTyped'
+      liftIO $ print "after refactor"
       res <- runRefactor (SourceFileKey (moduleSourceFile moduleName) moduleName, mod) []
                $ refact $ correctRefactorSpan mod $ readSrcSpan span
       case res of Right r -> liftIO $ mapM_ (putStrLn . prettyPrint . snd . fromContentChanged) r
@@ -72,7 +81,7 @@ useFlags args = do
     $ liftIO $ putStrLn $ showSDocUnsafe $ cat $ map pprWarning warnings
   unless (null errs)
     $ liftIO $ putStrLn $ showSDocUnsafe $ cat $ map pprErr errs
-  void $ setSessionDynFlags newDynFlags
+  void $ setSessionDynFlags newDynFlags --  { pluginModNames = pluginModNames newDynFlags ++ [mkModuleName "Data.Record.Anon.Plugin", mkModuleName "RecordDotPreprocessor"]})
   when (any ("-package-db" `isSuffixOf`) args) reloadPkgDb
   return (map unLoc leftovers, snd . change)
 
@@ -91,7 +100,9 @@ initGhcFlags = initGhcFlags' False True
 initGhcFlagsForTest :: Ghc ()
 initGhcFlagsForTest = do initGhcFlags' True False
                          dfs <- getSessionDynFlags
-                         void $ setSessionDynFlags $ dfs { hscTarget = HscAsm }
+                         void $ setSessionDynFlags $ dfs { hscTarget = HscAsm
+                                                        --  , pluginModNames = pluginModNames dfs ++ [mkModuleName "Data.Record.Anon.Plugin", mkModuleName "RecordDotPreprocessor"]
+                                                          }
 
 -- | Sets up basic flags and settings for GHC
 initGhcFlags' :: Bool -> Bool -> Ghc ()
@@ -109,6 +120,7 @@ initGhcFlags' needsCodeGen errorsSuppressed = do
              , ghcLink = if needsCodeGen then LinkInMemory else NoLink
              , ghcMode = CompManager
              , packageFlags = ExposePackage "template-haskell" (PackageArg "template-haskell") (ModRenaming True []) : packageFlags dflags
+            --  , pluginModNames = pluginModNames dflags ++ [mkModuleName "Data.Record.Anon.Plugin", mkModuleName "RecordDotPreprocessor"]
              }
 
 -- | Use the given source directories when searching for imported modules
@@ -171,21 +183,64 @@ loadModule workingDir moduleName
 -- | The final version of our AST, with type infromation added
 type TypedModule = Ann AST.UModule IdDom SrcTemplateStage
 
+removeDynFlag :: DynFlags -> DynFlags
+-- removeDynFlag dyn = trace ("printing dynflags :: " ++ (showOutputable $ pluginModNames dyn)) $ dyn 
+removeDynFlag dyn = let oldPlugins = pluginModNames dyn
+                        newPlugins = filter (\x -> x /= GHC.mkModuleName "RecordDotPreprocessor") oldPlugins 
+                    in dyn {pluginModNames = newPlugins}
+
 -- | Get the typed representation of a Haskell module.
 parseTyped :: ModSummary -> Ghc TypedModule
 parseTyped modSum = withAlteredDynFlags (return . normalizeFlags) $ do
   let hasCppExtension = Cpp `xopt` ms_hspp_opts modSum
-      ms = modSumNormalizeFlags modSum
-  when (ApplicativeDo `xopt` ms_hspp_opts modSum) $ liftIO $ throwIO $ UnsupportedExtension "ApplicativeDo"
-  when (OverloadedLabels `xopt` ms_hspp_opts modSum) $ liftIO $ throwIO $ UnsupportedExtension "OverloadedLabels"
-  when (ImplicitParams `xopt` ms_hspp_opts modSum) $ liftIO $ throwIO $ UnsupportedExtension "ImplicitParams"
+      ms' = modSumNormalizeFlags modSum
+  -- when (ApplicativeDo `xopt` ms_hspp_opts modSum) $ liftIO $ throwIO $ UnsupportedExtension "ApplicativeDo"
+  -- when (OverloadedLabels `xopt` ms_hspp_opts modSum) $ liftIO $ throwIO $ UnsupportedExtension "OverloadedLabels"
+  -- when (ImplicitParams `xopt` ms_hspp_opts modSum) $ liftIO $ throwIO $ UnsupportedExtension "ImplicitParams"
+  dyn <- getSessionDynFlags
+  -- liftIO $ print $ "before parse: " ++ show (moduleNameFS <$> pluginModNames dyn) ++ " moduleName: " ++ (Module.moduleNameString $ moduleName $ ms_mod ms)
+  --hs_env <- getSession
+  --v <- liftIO $ runHsc hs_env $ hscFileFrontEnd ms
+  --liftIO $ print "after hscFileFrontEnd"
+  p' <- parseModule ms'
+  srcBuffer <- if hasCppExtension
+                    then liftIO $ hGetStringBuffer (getModSumOrig ms')
+                    else return (fromJust $ ms_hspp_buf $ pm_mod_summary p')
+  -- liftIO $ print $ "after parse: " ++ (Module.moduleNameString $ moduleName $ ms_mod ms) ++ " dynflags: " ++ show (moduleNameFS <$> pluginModNames (ms_hspp_opts $ pm_mod_summary  p))
+  liftIO $ print $ "ast parse: " ++ (showSDocUnsafe $ ppr $ pm_parsed_source p')
+  let pragmas = ((head $ (splitOn "module" (strBufToStr $ srcBuffer))))
+      x       = ((head $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p'))))
+      y       = ((last $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p'))))
+
+    -- adding 'import qualified GHC.Records.Extra' back to import list without '(implicit)' 
+  let fileData = (pragmas ++ x ++ "\nimport qualified GHC.Records.Extra\n" ++ y)
+      newFileData' = replace "hasField r\n    =" "hasField r\n    = undefined --" fileData
+      newFileData = replace "{-# OPTIONS_GHC -fplugin" "-- {-# OPTIONS_GHC -fplugin" newFileData'
+  if isInfixOf "-- {-# OPTIONS_GHC -fplugin" fileData then parseTyped' ms' else
+    if isInfixOf "-fplugin" fileData then do
+      liftIO $ writeToFile (ms_hspp_file ms') newFileData
+      void $ load (LoadUpTo $ mkModuleName $ getModSumName ms')
+      ms'' <- getModSummary $ mkModuleName $ getModSumName ms'
+      let ndf = removeDynFlag $ ms_hspp_opts ms''
+      setSessionDynFlags ndf
+      parseTyped' $ ms'' { ms_hspp_opts = ndf }
+    else parseTyped' ms'
+
+parseTyped' :: ModSummary -> Ghc TypedModule
+parseTyped' ms = do
+  let hasCppExtension = Cpp `xopt` ms_hspp_opts ms
   p <- parseModule ms
   tc <- typecheckModule p
+  liftIO $ print $ "ast parse: " ++ (showSDocUnsafe $ ppr $ pm_parsed_source p)
+  -- liftIO $ print $ "ast parse: " ++ (showSDocUnsafe $ ppr $ pm_mod_summary tc)
+  -- liftIO $ print $ "ast parse: " ++ show tc
   void $ GHC.loadModule tc -- when used with loadModule, the module will be loaded twice
+  liftIO $ print $ "ast parse: " ++ (showSDocUnsafe $ ppr $ pm_parsed_source p)
   let annots = pm_annotations p
   srcBuffer <- if hasCppExtension
                     then liftIO $ hGetStringBuffer (getModSumOrig ms)
                     else return (fromJust $ ms_hspp_buf $ pm_mod_summary p)
+  liftIO $ print "after srcBuffer"
   withTempSession (\e -> e { hsc_dflags = ms_hspp_opts ms })
     $ (if hasCppExtension then prepareASTCpp else prepareAST) srcBuffer . placeComments (fst annots) (getNormalComments $ snd annots)
         <$> (addTypeInfos (typecheckedSource tc)
@@ -194,6 +249,17 @@ parseTyped modSum = withAlteredDynFlags (return . normalizeFlags) $ do
                          $ trfModuleRename ms parseTrf
                              (fromJust $ tm_renamed_source tc)
                              (pm_parsed_source p)))
+
+writeToFile file str = do
+  print "writeToFile 1"
+  liftIO $ withBinaryFile file WriteMode $ \handle -> do
+              hSetEncoding handle utf8
+              hPutStr handle str
+              hFlush handle
+  return ()
+
+strBufToStr :: StringBuffer -> String
+strBufToStr sb@(StringBuffer _ len _) = lexemeToString sb len
 
 data UnsupportedExtension = UnsupportedExtension String
   deriving Show
@@ -223,7 +289,7 @@ codeGenDfs dfs = dfs { hscTarget = HscInterpreted, ghcLink = LinkInMemory }
 -- | Forces ASM code generation for a given module
 forceAsmGen :: ModSummary -> ModSummary
 forceAsmGen ms = ms { ms_hspp_opts = modOpts' }
-  where modOpts = (ms_hspp_opts ms) { hscTarget = defaultObjectTarget (targetPlatform (ms_hspp_opts ms)) }
+  where modOpts = (ms_hspp_opts ms) { hscTarget = defaultObjectTarget (ms_hspp_opts ms)}
         modOpts' = modOpts { ghcLink = LinkInMemory }
 
 -- | Normalizes the flags for a module summary

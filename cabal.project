@@ -1,15 +1,13 @@
--- Cabal project file, for more details see
--- http://cabal.readthedocs.io/en/latest/nix-local-build.html#configuring-builds-with-cabal-project
-
 packages:
-    -- core packages
-    src/ast
-    src/ast-ghc
-    src/ast-trf
-    src/ast-gen
-    src/ast-ppr
-    src/refactor
-    -- add-on packages
-    demo
-    src/cli
-    src/debug
+  src/ast
+  src/backend-ghc
+  src/rewrite
+  src/prettyprint
+  src/refactor
+  src/builtin-refactorings
+  src/experimental-refactorings
+  demo
+  src/cli
+  src/debug
+  src/daemon
+

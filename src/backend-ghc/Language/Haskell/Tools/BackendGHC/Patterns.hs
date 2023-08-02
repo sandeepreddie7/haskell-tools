@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, LiberalTypeSynonyms, DataKinds #-}
 
 -- | Functions that convert the pattern-related elements of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.Patterns where
@@ -11,14 +11,14 @@ module Language.Haskell.Tools.BackendGHC.Patterns where
 import ApiAnnotation as GHC (AnnKeywordId(..))
 import BasicTypes as GHC (Boxity(..))
 import Data.List
-import HsExpr (HsSplice(..))
-import HsLit as GHC (HsOverLit(..))
-import HsPat as GHC
-import HsTypes as GHC (HsConDetails(..), hswc_body, hsib_body)
+import GHC.Hs.Expr (HsSplice(..))
+import GHC.Hs.Lit as GHC (HsOverLit(..))
+import GHC.Hs.Pat as GHC
+import GHC.Hs.Types as GHC (HsConDetails(..), hswc_body, hsib_body)
 import Language.Haskell.Tools.BackendGHC.GHCUtils (getFieldOccName)
 import SrcLoc as GHC
 import Control.Monad.Reader
-import HsExtension (GhcPass)
+import GHC.Hs.Extension
 
 import {-# SOURCE #-} Language.Haskell.Tools.BackendGHC.Exprs (trfExpr)
 import {-# SOURCE #-} Language.Haskell.Tools.BackendGHC.Types (trfType)
@@ -32,7 +32,7 @@ import Language.Haskell.Tools.BackendGHC.Utils
 import Language.Haskell.Tools.AST (Ann, Dom, RangeStage)
 import qualified Language.Haskell.Tools.AST as AST
 
-trfPattern :: forall n r p . (TransformName n r, n ~ GhcPass p) => Located (Pat n) -> Trf (Ann AST.UPattern (Dom r) RangeStage)
+trfPattern :: forall n r p . (TransformName n r) => Located (Pat (GhcPass n)) -> Trf (Ann AST.UPattern (Dom (GhcPass r)) RangeStage)
 -- field wildcards are not directly represented in GHC AST
 trfPattern (L l (ConPatIn name (RecCon (HsRecFields flds _)))) | any ((l ==) . getLoc) flds
   = focusOn l $ do
@@ -43,12 +43,12 @@ trfPattern (L l (ConPatIn name (RecCon (HsRecFields flds _)))) | any ((l ==) . g
 trfPattern p = trfLocNoSema trfPattern' (correctPatternLoc p)
 
 -- | Locations for right-associative infix patterns are incorrect in GHC AST
-correctPatternLoc :: Located (Pat n) -> Located (Pat n)
+correctPatternLoc :: Located (Pat (GhcPass n)) -> Located (Pat (GhcPass n))
 correctPatternLoc (L _ p@(ConPatIn _ (InfixCon left right)))
-  = L (getLoc (correctPatternLoc left) `combineSrcSpans` getLoc (correctPatternLoc right)) p
+  = L (getLoc (left) `combineSrcSpans` getLoc (right)) p
 correctPatternLoc p = p
 
-trfPattern' :: forall n r p . (TransformName n r, n ~ GhcPass p) => Pat n -> Trf (AST.UPattern (Dom r) RangeStage)
+trfPattern' :: forall n r p . (TransformName n r) => Pat (GhcPass n) -> Trf (AST.UPattern (Dom (GhcPass r)) RangeStage)
 trfPattern' (WildPat _) = pure AST.UWildPat
 trfPattern' (VarPat _ name) = define $ AST.UVarPat <$> trfName @n name
 trfPattern' (LazyPat _ pat) = AST.UIrrefutablePat <$> trfPattern pat
@@ -67,7 +67,7 @@ trfPattern' (SplicePat _ splice) = AST.USplicePat <$> trfSplice splice
 trfPattern' (LitPat _ lit) = AST.ULitPat <$> annCont (pure $ RealLiteralInfo (monoLiteralType lit)) (trfLiteral' lit)
 trfPattern' (NPat _ (ol_val . unLoc -> lit) _ _) = AST.ULitPat <$> annCont (asks contRange >>= pure . PreLiteralInfo) (trfOverloadedLit lit)
 trfPattern' (NPlusKPat _ id (L l lit) _ _ _) = AST.UNPlusKPat <$> define (trfName @n id) <*> annLoc (asks contRange >>= pure . PreLiteralInfo) (pure l) (trfOverloadedLit (ol_val lit))
-trfPattern' (SigPat typ pat) = AST.UTypeSigPat <$> trfPattern pat <*> trfType (hsib_body $ hswc_body typ)
+-- trfPattern' (SigPat typ pat) = AST.UTypeSigPat <$> trfPattern pat <*> trfType (hsib_body $ hswc_body typ)
 trfPattern' (CoPat _ _ pat _) = trfPattern' pat -- coercion pattern introduced by GHC
 trfPattern' (SumPat _ pat tag arity)
   = do sepsBefore <- focusBeforeLoc (srcSpanStart (getLoc pat)) (eachTokenLoc (AnnOpen : replicate (tag - 1) AnnVbar))
@@ -80,6 +80,6 @@ trfPattern' (SumPat _ pat tag arity)
   where makePlaceholder l = annLocNoSema (pure (srcLocSpan l)) (pure AST.UUnboxedSumPlaceHolder)
 trfPattern' p = unhandledElement "pattern" p
 
-trfPatternField' :: forall n r p . (TransformName n r, n ~ GhcPass p) => HsRecField n (LPat n) -> Trf (AST.UPatternField (Dom r) RangeStage)
+trfPatternField' :: forall n r p . (TransformName n r) => HsRecField (GhcPass n) (LPat (GhcPass n)) -> Trf (AST.UPatternField (Dom (GhcPass r)) RangeStage)
 trfPatternField' (HsRecField id arg False) = AST.UNormalFieldPattern <$> trfName @n (getFieldOccName id) <*> trfPattern arg
 trfPatternField' (HsRecField id _ True) = AST.UFieldPunPattern <$> trfName @n (getFieldOccName id)
