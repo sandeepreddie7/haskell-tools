@@ -48,4 +48,4 @@ initSession = DaemonSessionState [] Nothing id id [] False [] Nothing [] empty
 resetSession :: DaemonSessionState -> DaemonSessionState
 resetSession DaemonSessionState{..} = initSession { _packageDB, _ghcFlagsSet }
 
-makeReferences ''DaemonSessionState
+-- makeLenses ''DaemonSessionState

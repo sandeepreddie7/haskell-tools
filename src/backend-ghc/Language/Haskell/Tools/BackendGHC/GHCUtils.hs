@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances, LiberalTypeSynonyms #-}
 
 -- | Utility functions defined on the GHC AST representation.
 module Language.Haskell.Tools.BackendGHC.GHCUtils where
@@ -112,7 +112,7 @@ instance (GHCName n, HsHasName (IdP n)) => HsHasName (InstDecl n) where
   hsGetNames _ _ = []
 
 instance (GHCName n, HsHasName (IdP n), HsHasName r) => HsHasName (FamEqn n p r) where
-  hsGetNames p (FamEqn _ id _ _ rhs) = hsGetNames p id ++ hsGetNames p rhs
+  hsGetNames p (FamEqn _ id _ _ _ rhs) = hsGetNames p id ++ hsGetNames p rhs
 
 instance (GHCName n, HsHasName (IdP n)) => HsHasName (DataFamInstDecl n) where
   hsGetNames p dfid = hsGetNames p (hsib_body $ dfid_eqn dfid)
@@ -211,7 +211,7 @@ instance HsHasName (IdP n) => HsHasName (Pat n) where
   hsGetNames x (ConPatOut {pat_args = details}) = concatMap (hsGetNames x) (hsConPatArgs details)
   hsGetNames x (ViewPat _ _ p) = hsGetNames x p
   hsGetNames x (NPlusKPat _ lname _ _ _ _) = hsGetNames x lname
-  hsGetNames x (SigPat _ p) = hsGetNames x p
+  hsGetNames x (SigPat _ p _) = hsGetNames x p
   hsGetNames _ _ = []
 
 instance (GHCName (GhcPass n), HsHasName (IdP (GhcPass n))) => HsHasName (HsGroup (GhcPass n)) where

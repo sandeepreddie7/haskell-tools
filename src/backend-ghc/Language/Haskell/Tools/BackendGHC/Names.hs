@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds, LiberalTypeSynonyms #-}
 
 -- | Functions that convert the basic elements of the GHC AST to corresponding elements in the Haskell-tools AST representation
 module Language.Haskell.Tools.BackendGHC.Names where
@@ -37,6 +37,9 @@ import Language.Haskell.Tools.BackendGHC.Utils
 
 trfOperator :: forall n r . TransformName n r => Located (IdP n) -> Trf (Ann AST.UOperator (Dom r) RangeStage)
 trfOperator = trfLocNoSema (trfOperator' @n)
+
+-- trfOperators :: forall n r . TransformName n r => IdP n -> Trf (Ann AST.UOperator (Dom r) RangeStage)
+-- trfOperators = trfLocNoSema (trfOperator' @n)
 
 trfOperator' :: forall n r . TransformName n r => IdP n -> Trf (AST.UOperator (Dom r) RangeStage)
 trfOperator' n
@@ -94,7 +97,7 @@ type ConvOk n = ( XSigPat n ~ HsWildCardBndrs n (HsImplicitBndrs n (LHsType n))
                 , NameOrRdrName (IdP n) ~ IdP n
                 )
 
-class (ConvOk n, Eq n, CorrectPass n, GHCName n, FromGHCName (IdP n), HasOccName (IdP n))
+class (Eq n, CorrectPass n, GHCName n, FromGHCName (IdP n), HasOccName (IdP n))
         => TransformableName n where
   correctNameString :: IdP n -> Trf String
   transformSplice :: HsSplice GhcPs -> Trf (HsSplice n)

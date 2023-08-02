@@ -1,7 +1,6 @@
 module Language.Haskell.Tools.Refactor.Builtin.ExtensionOrganizer.Checkers.TypeOperatorsChecker where
 
-import PrelNames (eqTyConName)
-import qualified Name    as GHC (nameOccName)
+import qualified Name    as GHC (nameOccName, isTyConName)
 import qualified OccName as GHC (isTcOcc, isSymOcc)
 
 import Data.Generics.Uniplate.Data()
@@ -33,7 +32,7 @@ chkTypeOperatorsDecl = conditional chkTypeOperatorsDecl' TypeOperators
 chkTypeOperatorsType' :: CheckNode Type
 chkTypeOperatorsType' t@(InfixTypeApp _ op _)
   | Just name <- semanticsName op
-  , name == eqTyConName
+  , GHC.isTyConName name
   = return t
   | otherwise = addEvidence TypeOperators t
 chkTypeOperatorsType' t = return t
