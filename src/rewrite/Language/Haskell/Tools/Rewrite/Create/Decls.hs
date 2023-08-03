@@ -37,6 +37,8 @@ mkTypeSigDecl = mkAnn child . UTypeSigDecl
 mkValueBinding :: ValueBind -> Decl
 mkValueBinding = mkAnn child . UValueBinding
 
+mkValueBinding' :: ValueBind' -> Decl'
+mkValueBinding' = mkAnn' child . UValueBinding
 -- | Creates a Template Haskell splice declaration (@ $(generateDecls) @)
 mkSpliceDecl :: Splice -> Decl
 mkSpliceDecl = mkAnn child . USpliceDecl

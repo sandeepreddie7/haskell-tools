@@ -74,6 +74,7 @@ type LanguageExtension = Ann ULanguageExtension IdDom SrcTemplateStage
 
 -- | Haskell declaration
 type Decl = Ann UDecl IdDom SrcTemplateStage
+type Decl' = Ann UDecl (Dom GhcPs) SrcTemplateStage
 
 -- | The list of declarations that can appear in a typeclass
 type ClassBody = Ann UClassBody IdDom SrcTemplateStage
@@ -293,6 +294,7 @@ type ArrowApp = Ann UArrowAppl IdDom SrcTemplateStage
 
 -- | A statement in a do-notation
 type Stmt = Ann UStmt IdDom SrcTemplateStage
+type Stmt' = Ann UStmt (Dom GhcPs) SrcTemplateStage
 
 -- | Keywords @do@ or @mdo@ to start a do-block
 type DoKind = Ann UDoKind IdDom SrcTemplateStage

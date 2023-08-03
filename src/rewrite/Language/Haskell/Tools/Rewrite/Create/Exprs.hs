@@ -63,6 +63,9 @@ mkCase expr cases = mkAnn ("case " <> child <> " of " <> child) $ UCase expr (mk
 mkDoBlock :: [Stmt] -> Expr
 mkDoBlock stmts = mkAnn (child <> " " <> child) $ UDo (mkAnn "do" UDoKeyword) (mkAnnList (indented list) stmts)
 
+mkDoBlock' :: [Stmt'] -> Expr'
+mkDoBlock' stmts = mkAnn' (child <> " " <> child) $ UDo (mkAnn' "do" UDoKeyword) (mkAnnList' (indented list) stmts)
+
 -- | Create a mdo-notation expressions (@ mdo x <- act1; act2 @)
 mkMDoBlock :: [Stmt] -> Expr
 mkMDoBlock stmts = mkAnn (child <> " " <> child) $ UDo (mkAnn "mdo" UMDoKeyword) (mkAnnList (indented list) stmts)
