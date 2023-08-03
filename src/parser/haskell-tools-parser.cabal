@@ -15,7 +15,6 @@ library
   exposed-modules:     Language.Haskell.Tools.Parser.ParseModule
                      , Language.Haskell.Tools.Parser.SplitModule
                      , Language.Haskell.Tools.Parser.ProgramOptions
-                     , Language.Haskell.Tools.Parser.Interface
 
   build-depends:       base                       
                      , aeson                     >= 1.0  && < 1.5
@@ -44,4 +43,17 @@ library
                      , shelly
                      , ghc-boot
                      , optparse-applicative
+  default-language:    Haskell2010
+
+executable ht-parse
+  ghc-options:         -rtsopts
+  build-depends:       base                       
+                     , split                     >= 0.2 && < 0.3
+                     , mtl                       >= 2.2 && < 2.3
+                     , directory                 >= 1.2  && < 1.4
+                     , filepath                  >= 1.4  && < 2.0
+                     , optparse-applicative      
+                     , haskell-tools-parser
+  hs-source-dirs:      exe
+  main-is:             Main.hs
   default-language:    Haskell2010

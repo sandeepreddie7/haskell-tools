@@ -37,8 +37,8 @@ data WriteFileConfig =
 
 opts :: Parser ParseConfig
 opts =
-      subparser (command "getFunDeps" $ (info (parserConfig FunctionDependency) (progDesc "Get the number of top imported modules")))
-  <|> subparser (command "writeModSplits" $ (info writeFileConfig (progDesc "Get the number of top imported modules")))
+      subparser (command "getFunDeps" $ (info (parserConfig FunctionDependency) (progDesc "Get the function dependency graph of a module")))
+  <|> subparser (command "writeModSplits" $ (info writeFileConfig (progDesc "Split the grouped functions into modules")))
 
 parserConfig :: ASTRefactors -> Parser ParseConfig
 parserConfig refactor =
