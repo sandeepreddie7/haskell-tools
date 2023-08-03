@@ -10,7 +10,7 @@ data Options =
     { optCommand :: ParseConfig
     }
 
-data ASTRefactors = FunctionDependency | Other
+data ASTRefactors = FunctionDependency | LetRefactoring
   deriving (Show)
 
 data ParseConfig = Refact ASTParseConfig | SplitAndWrite WriteFileConfig
@@ -38,6 +38,7 @@ data WriteFileConfig =
 opts :: Parser ParseConfig
 opts =
       subparser (command "getFunDeps" $ (info (parserConfig FunctionDependency) (progDesc "Get the function dependency graph of a module")))
+  <|> subparser (command "letRefactor" $ (info (parserConfig FunctionDependency) (progDesc "Multiple Let Refactoring")))
   <|> subparser (command "writeModSplits" $ (info writeFileConfig (progDesc "Split the grouped functions into modules")))
 
 parserConfig :: ASTRefactors -> Parser ParseConfig

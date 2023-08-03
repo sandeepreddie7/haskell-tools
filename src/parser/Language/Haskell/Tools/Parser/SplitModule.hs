@@ -40,7 +40,8 @@ import Data.List
 import qualified Data.Map.Strict as SMap (empty, toList)
 
 import Debug.Trace (trace, traceShowId)
-
+import Language.Haskell.Tools.Debug.RangeDebug
+import Language.Haskell.Tools.Debug.RangeDebugInstances
 import Outputable
 import Language.Haskell.Tools.PrettyPrint
 
@@ -65,6 +66,9 @@ import qualified Data.HashMap.Strict as HM
 import System.IO
 import Control.Monad
 import qualified Data.Aeson as A
+
+import Language.Haskell.Tools.AST.Representation.Binds (ULocalBind)
+
 
 
 
@@ -165,3 +169,4 @@ getFunctionsCalledInFunction expr = do
 getFunctions' :: Ann UName (Dom GhcPs) SrcTemplateStage -> String
 getFunctions' expr@(Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart ex)))))) = ex
 getFunctions' expr = ""
+
