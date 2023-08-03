@@ -14,6 +14,8 @@ library
   ghc-options: -O2
   exposed-modules:     Language.Haskell.Tools.Parser.ParseModule
                      , Language.Haskell.Tools.Parser.SplitModule
+                     , Language.Haskell.Tools.Parser.ProgramOptions
+                     , Language.Haskell.Tools.Parser.Interface
 
   build-depends:       base                       
                      , aeson                     >= 1.0  && < 1.5
@@ -41,4 +43,5 @@ library
                      , unordered-containers
                      , shelly
                      , ghc-boot
+                     , optparse-applicative
   default-language:    Haskell2010

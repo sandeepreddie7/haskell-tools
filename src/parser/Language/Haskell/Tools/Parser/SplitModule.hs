@@ -64,6 +64,7 @@ import  Language.Haskell.Tools.Rewrite.Match.Exprs
 import qualified Data.HashMap.Strict as HM
 import System.IO
 import Control.Monad
+import qualified Data.Aeson as A
 
 
 
@@ -74,9 +75,13 @@ import Control.Monad
 
 --       Pretty easy now. Chcek wheter it is already in the ExtMap.
 
-getFunctionDepOfModule :: String -> String -> IO (HM.HashMap String [String])
-getFunctionDepOfModule modulePath moduleName = do
+getFunctionDeps :: String -> String -> IO (HM.HashMap String [String])
+getFunctionDeps modulePath moduleName = do
     moduleAST <- moduleParser modulePath moduleName
+    getFunctionDepOfModule moduleAST
+
+getFunctionDepOfModule :: (Ann AST.UModule (Dom GhcPs) SrcTemplateStage) -> IO (HM.HashMap String [String])
+getFunctionDepOfModule moduleAST = do
     let !funDepList = mapMaybe (traverseOverUValBind) (moduleAST ^? biplateRef)
         funList = HM.fromList $ map (\(fun,y) -> (fun, (fst y , nub $ filter (\x -> x `elem` (fst <$> funDepList)) (snd y)))) funDepList
     pure $ HM.foldlWithKey' (\acc key (x,y) -> HM.insert key (nub $ getAllRelatedFuns x y funList) acc) HM.empty funList
@@ -90,6 +95,14 @@ suffixToBeAdded = ".Transaction"
 
 newModPath :: String
 newModPath = "/home/chaitanya/Desktop/work/euler-api-txns/euler-x/src-generated/Product/OLTP/Transaction/Transaction"
+
+splitAndWrite :: String -> String -> String -> String -> IO Int
+splitAndWrite modulePath moduleName groupedFunctionsString modFunReferenceString = do
+    moduleAST <- moduleParser modulePath moduleName
+    resolveDeps <- getFunctionDepOfModule moduleAST
+    let groupedFunctions = fromMaybe (mempty) (A.decode $ A.encode groupedFunctionsString)  
+    let modFunReference = fromMaybe (mempty) (A.decode $ A.encode modFunReferenceString)  
+    writeBackGroupedModules modulePath moduleName resolveDeps moduleAST groupedFunctions modFunReference
 
 writeBackGroupedModules :: String -> String -> HM.HashMap String [String] -> (Ann AST.UModule (Dom GhcPs) SrcTemplateStage) -> [[String]] -> HM.HashMap String Int -> IO Int
 writeBackGroupedModules modulePath moduleName resolveDeps moduleAST groupedFunctions modFunReference = do
