@@ -47,9 +47,22 @@ trfModule mod hsMod = do
      (\sr -> combineSrcSpans sr <$> (uniqueTokenAnywhere AnnEofPos))
      (\(HsModule name exports imports decls deprec _) ->
         AST.UModule <$> trfFilePragmas
-                    <*> trfModuleHead name (srcSpanStart (foldLocs (map getLoc imports ++ map getLoc decls))) exports deprec
-                    <*> trfImports imports
-                    <*> trfDecls decls) $ hsMod
+                    <*> (trfModuleHead name (srcSpanStart (foldLocs (map getLoc imports ++ map getLoc decls))) exports deprec)
+                    <*> (trfImports imports False)
+                    <*>  (trfDecls decls)) $ hsMod
+
+trfModule' :: ModSummary -> Located (HsModule GhcPs) -> Trf (Ann AST.UModule (Dom GhcPs) RangeStage)
+trfModule' mod hsMod = do
+  -- createModuleInfo involves reading the ghc compiler state, so it must be evaluated
+  -- or large parts of the representation will be kept
+  !modInfo <- createModuleInfo' mod (maybe noSrcSpan getLoc $ hsmodName $ unLoc hsMod) (hsmodImports $ unLoc hsMod)
+  trfLocCorrect (pure modInfo)
+     (\sr -> combineSrcSpans sr <$> (uniqueTokenAnywhere AnnEofPos))
+     (\(HsModule name exports imports decls deprec _) ->
+        AST.UModule <$> trfFilePragmas
+                    <*> (trfModuleHead name (srcSpanStart (foldLocs (map getLoc imports ++ map getLoc decls))) exports deprec)
+                    <*> (trfImports imports True)
+                    <*>  (trfDecls decls)) $ hsMod
 
 -- | Transformes the module in its typed state. Uses the results of 'trfModule' to extract program
 -- elements (splices for example) that are not kept in the typed representation.
@@ -60,7 +73,7 @@ trfModuleRename :: ModSummary -> Ann AST.UModule (Dom GhcPs) RangeStage
 trfModuleRename mod rangeMod (gr,imports,exps,_) hsMod
     = do -- createModuleInfo involves reading the ghc compiler state, so it must be evaluated
          -- or large parts of the representation will be kept
-         !info <- createModuleInfo mod (maybe noSrcSpan getLoc $ hsmodName $ unLoc hsMod) imports
+         !info <- createModuleInfo' mod (maybe noSrcSpan getLoc $ hsmodName $ unLoc hsMod) imports 
          trfLocCorrect (pure info) (\sr -> combineSrcSpans sr <$> (uniqueTokenAnywhere AnnEofPos)) (trfModuleRename' (info ^. implicitNames)) hsMod
   where roleAnnots = rangeMod ^? AST.modDecl&AST.annList&filtered ((\case Ann _ (AST.URoleDecl {}) -> True; _ -> False))
         originalNames = Map.fromList $ mapMaybe getSourceAndInfo (rangeMod ^? biplateRef)
@@ -81,7 +94,7 @@ trfModuleRename mod rangeMod (gr,imports,exps,_) hsMod
         trfModuleRename' :: [PName GhcRn]
                          -> HsModule GhcPs -> Trf (AST.UModule (Dom GhcRn) RangeStage)
         trfModuleRename' preludeImports hsMod@(HsModule name exports _ _ deprec _) = do
-          transformedImports <- orderAnnList <$> (trfImports imports)
+          transformedImports <- orderAnnList <$> (trfImports imports False)
 
           let importNames impd = ( impd ^. AST.importModule & AST.moduleNameString
                                  , impd ^? AST.importAs & AST.annJust & AST.importRename & AST.moduleNameString
@@ -158,11 +171,11 @@ trfExport = trfMaybeLocNoSema $ \case
   other -> do trf <- trfIESpec' other
               fmap AST.UDeclExport <$> (sequence $ fmap (annContNoSema . return) trf)
 
-trfImports :: forall n r . TransformName n r => [LImportDecl n] -> Trf (AnnListG AST.UImportDecl (Dom r) RangeStage)
-trfImports (filter (not . ideclImplicit . unLoc) -> imps)
+trfImports :: forall n r . TransformName n r => [LImportDecl n] -> Bool -> Trf (AnnListG AST.UImportDecl (Dom r) RangeStage)
+trfImports (filter (not . ideclImplicit . unLoc) -> imps) jusParse
   = do res <- AnnListG <$> importDefaultLoc <*> mapM trfImport imps
        -- the list of imported entities is added after the imports have been evaluated, to have all instances loaded
-       !importData <- mapM (createImportData . unLoc) imps :: Trf [ImportInfo r]
+       !importData <- mapM (\x -> if jusParse then createImportData' . unLoc $ x else createImportData $ unLoc x) imps :: Trf [ImportInfo r]
        return $ flip evalState 0 $ AST.annList & AST.annotation & AST.semanticInfo
                                      !~ (\_ -> get >>= \i -> modify (+1) >> return (importData !! i)) $ res
   where importDefaultLoc = noSemaInfo . AST.ListPos (if List.null imps then "\n" else "") "" "\n" (Just []) . srcSpanEnd

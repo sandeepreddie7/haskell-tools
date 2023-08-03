@@ -20,7 +20,8 @@ import SrcLoc as GHC
 import Control.Monad.Reader
 import HsExtension (GhcPass)
 import HsPat
-import Debug.Trace (trace)
+import Outputable
+import Debug.Trace (trace, traceShowId)
 
 import {-# SOURCE #-} Language.Haskell.Tools.BackendGHC.Exprs (trfExpr)
 import {-# SOURCE #-} Language.Haskell.Tools.BackendGHC.Types (trfType)

@@ -1,6 +1,7 @@
 module Language.Haskell.Tools.Rewrite.ElementTypes where
 
 import Language.Haskell.Tools.AST
+import GHC
 
 type AnnList node = AnnListG node IdDom SrcTemplateStage
 type AnnMaybe node = AnnMaybeG node IdDom SrcTemplateStage
@@ -13,9 +14,12 @@ type Module = Ann UModule IdDom SrcTemplateStage
 
 -- | Module declaration with name and (optional) exports
 type ModuleHead = Ann UModuleHead IdDom SrcTemplateStage
+type ModuleHead' = Ann UModuleHead (Dom GhcPs) SrcTemplateStage
+
 
 -- | A list of export specifications surrounded by parentheses
 type ExportSpecs = Ann UExportSpecs IdDom SrcTemplateStage
+type ExportSpecs' = Ann UExportSpecs (Dom GhcPs) SrcTemplateStage
 
 -- | Export specifier
 type ExportSpec = Ann UExportSpec IdDom SrcTemplateStage
@@ -31,15 +35,18 @@ type SubSpec = Ann USubSpec IdDom SrcTemplateStage
 
 -- | Pragmas that must be used after the module head
 type ModulePragma = Ann UModulePragma IdDom SrcTemplateStage
+type ModulePragma' = Ann UModulePragma (Dom GhcPs) SrcTemplateStage
 
 -- | Pragmas that must be used before defining the module
 type FilePragma = Ann UFilePragma IdDom SrcTemplateStage
 
 -- | An import declaration: @import Module.Name@
 type ImportDecl = Ann UImportDecl IdDom SrcTemplateStage
+type ImportDecl' = Ann UImportDecl (Dom GhcPs) SrcTemplateStage
 
 -- | Restriction on the imported names
 type ImportSpec = Ann UImportSpec IdDom SrcTemplateStage
+type ImportSpec' = Ann UImportSpec (Dom GhcPs) SrcTemplateStage
 
 -- | Marks the import as qualified: @qualified@
 type ImportQualified = Ann UImportQualified IdDom SrcTemplateStage
@@ -58,6 +65,7 @@ type ImportRenaming = Ann UImportRenaming IdDom SrcTemplateStage
 
 -- | The name of a module
 type ModuleName = Ann UModuleName IdDom SrcTemplateStage
+type ModuleName' = Ann UModuleName (Dom GhcPs) SrcTemplateStage
 
 -- | The name of the enabled language extension, for example (@ LambdaCase @)
 type LanguageExtension = Ann ULanguageExtension IdDom SrcTemplateStage
@@ -188,6 +196,7 @@ type PhaseControl = Ann UPhaseControl IdDom SrcTemplateStage
 
 -- | Value binding for top-level and local bindings
 type ValueBind = Ann UValueBind IdDom SrcTemplateStage
+type ValueBind' = Ann UValueBind (Dom GhcPs) SrcTemplateStage
 
 -- | Clause of function binding
 type Match = Ann UMatch IdDom SrcTemplateStage
@@ -197,6 +206,8 @@ type MatchLhs = Ann UMatchLhs IdDom SrcTemplateStage
 
 -- | Right hand side of a value binding (possible with guards): (@ = 3 @ or @ | x == 1 = 3; | otherwise = 4 @)
 type Rhs = Ann URhs IdDom SrcTemplateStage
+type Rhs' = Ann URhs (Dom GhcPs) SrcTemplateStage
+
 
 -- | A guarded right-hand side of a value binding (@ | x > 3 = 2 @)
 type GuardedRhs = Ann UGuardedRhs IdDom SrcTemplateStage
@@ -206,9 +217,12 @@ type RhsGuard = Ann URhsGuard IdDom SrcTemplateStage
 
 -- | Bindings that are enabled in local blocks (where or let).
 type LocalBind = Ann ULocalBind IdDom SrcTemplateStage
+type LocalBind' = Ann ULocalBind (Dom GhcPs) SrcTemplateStage
+
 
 -- | Local bindings attached to a declaration (@ where x = 42 @)
 type LocalBinds = Ann ULocalBinds IdDom SrcTemplateStage
+type LocalBinds' = Ann ULocalBinds (Dom GhcPs)  SrcTemplateStage
 
 -- | A fixity signature (@ infixl 5 +, - @).
 type FixitySignature = Ann UFixitySignature IdDom SrcTemplateStage
@@ -245,6 +259,8 @@ type PromotedKind = Ann (UPromoted UKind) IdDom SrcTemplateStage
 
 -- | Haskell expressions
 type Expr = Ann UExpr IdDom SrcTemplateStage
+type Expr' = Ann UExpr (Dom GhcPs) SrcTemplateStage
+
 
 -- | Clause of case expression (@ Just x -> x + 1 @)
 type Alt = Ann UAlt IdDom SrcTemplateStage
@@ -294,6 +310,8 @@ type CmdStmt = Ann UCmdStmt IdDom SrcTemplateStage
 
 -- | Representation of patterns for pattern bindings
 type Pattern = Ann UPattern IdDom SrcTemplateStage
+type Pattern' = Ann UPattern (Dom GhcPs) SrcTemplateStage
+
 
 -- Field specification of a record pattern
 type PatternField = Ann UPatternField IdDom SrcTemplateStage
@@ -321,16 +339,21 @@ type Operator = Ann UOperator IdDom SrcTemplateStage
 
 -- | A definition that functions as a name
 type Name = Ann UName IdDom SrcTemplateStage
+type Name' = Ann UName (Dom GhcPs) SrcTemplateStage
+
 
 -- | Possible qualified names. Contains also implicit names.
 -- Linear implicit parameter: @%x@. Non-linear implicit parameter: @?x@.
 type QualifiedName = Ann UQualifiedName IdDom SrcTemplateStage
+type QualifiedName' = Ann UQualifiedName (Dom GhcPs) SrcTemplateStage
 
 -- | Parts of a qualified name.
 type NamePart = Ann UNamePart IdDom SrcTemplateStage
+type NamePart' = Ann UNamePart (Dom GhcPs)  SrcTemplateStage
 
 -- | Program elements formatted as string literals (import packages, pragma texts)
 type StringNode = Ann UStringNode IdDom SrcTemplateStage
+type StringNode' = Ann UStringNode (Dom GhcPs) SrcTemplateStage
 
 -- * Optional AST elements
 
@@ -344,6 +367,7 @@ type MaybeClassBody = AnnMaybe UClassBody
 type MaybeInstBody = AnnMaybe UInstBody
 type MaybeExpr = AnnMaybe UExpr
 type MaybeExportSpecs = AnnMaybe UExportSpecs
+type MaybeExportSpecs' = AnnMaybeG UExportSpecs (Dom GhcPs) SrcTemplateStage
 type MaybeImportQualified = AnnMaybe UImportQualified
 type MaybeImportSource = AnnMaybe UImportSource
 type MaybeImportSafe = AnnMaybe UImportSafe
@@ -351,6 +375,7 @@ type MaybeImportSpec = AnnMaybe UImportSpec
 type MaybeModuleHead = AnnMaybe UModuleHead
 type MaybeImportModifier = AnnMaybe UImportModifier
 type MaybeModulePragma = AnnMaybe UModulePragma
+type MaybeModulePragma' = AnnMaybeG UModulePragma (Dom GhcPs) SrcTemplateStage
 type MaybeSubSpec = AnnMaybe USubSpec
 type MaybeStringNode = AnnMaybe UStringNode
 type MaybeImportRenaming = AnnMaybe UImportRenaming
@@ -363,6 +388,7 @@ type MaybeFunDeps = AnnMaybe UFunDeps
 -- * AST elements with multiplicity
 
 type MatchList = AnnList UMatch
+type MatchList' = AnnListG UMatch (Dom GhcPs) SrcTemplateStage
 type DeclList = AnnList UDecl
 type PatternList = AnnList UPattern
 type OperatorList = AnnList UOperator

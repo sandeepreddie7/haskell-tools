@@ -91,7 +91,6 @@ library
                      , Language.Haskell.Tools.Debug.Show
                      , Language.Haskell.Tools.Debug.RangeDebug
                      , Language.Haskell.Tools.Debug.RangeDebugInstances
-                     , Language.Haskell.Tools.Refactor.Builtin.ShowTree
                      , Language.Haskell.Tools.Refactor.Builtin.ChangeMonad
                      , Language.Haskell.Tools.Refactor.Builtin.WriteBack
                      , Language.Haskell.Tools.Refactor.Builtin.Ref1

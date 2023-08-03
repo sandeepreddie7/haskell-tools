@@ -49,3 +49,19 @@ By implementing a client to handle a simple protocol you can make your favourite
 ## Help to improve the framework
 
 [This section](documentation/development/framework-improvement.md) is for those of you who want to improve the framework to help your refactorings and tools. The [limitations](documentation/development/limitations.md) section could be a good start where to improve the system.
+
+## Using only parse using haskell-tools-parser
+
+For refactorings that doesnt need type check, that is when you do not need any type information for your refactorings, then this section can be used
+
+Working on haskell-tools-parser
+
+1. For getting the executable, Run stack install haskell-tools-parser
+
+2. Use the executables, like <path-to-executable>/ht-parse command --args, command and args depend upon the use case as defined in ProgramOptions.hs file
+  For example. To get the function dependency of a module, run ht-parse getFunDeps -p "<modPath>" "<modName>"
+
+3. Writing new refactorings:
+      To write new refactors, Check reference of built-in-refactorings
+      - [Guide for writing refactorings](documentation/development/refactoring-guide.md).
+      Add in program options, add the refactoring in ASTRefactors type

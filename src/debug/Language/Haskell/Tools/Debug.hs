@@ -136,8 +136,8 @@ demoRefactor1 flag command workingDir args moduleName =
     -- removing (implicit) as it causes parse error 
 
     let pragmas = ((head $ (splitOn "module" (strBufToStr srcBuffer))))
-        x       = ((head $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p))))
-        y       = ((last $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p))))
+        x       = ((head $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDoc dynflags'{pprCols = 1000} $ ppr $ pm_parsed_source p))))
+        y       = ((last $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDoc dynflags'{pprCols = 1000} $ ppr $ pm_parsed_source p))))
     let fileData = (pragmas ++ x ++ "\nimport qualified GHC.Records.Extra\n" ++ y)
     -- TODO :: Add extra newLine
     -- liftIO $ putStrLn $ ("fileData :: " ++ fileData)
