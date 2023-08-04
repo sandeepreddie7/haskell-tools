@@ -175,7 +175,7 @@ trfImports :: forall n r . TransformName n r => [LImportDecl (GhcPass n)] -> Boo
 trfImports (filter (not . ideclImplicit . unLoc) -> imps) jusParse
   = do res <- AnnListG <$> importDefaultLoc <*> mapM trfImport imps
        -- the list of imported entities is added after the imports have been evaluated, to have all instances loaded
-       !importData <- mapM (\x -> if jusParse then createImportData' . unLoc $ x else createImportData $ unLoc x) imps :: Trf [ImportInfo r]
+       !importData <- mapM (\x -> if jusParse then createImportData' . unLoc $ x else createImportData $ unLoc x) imps ::  Trf [ImportInfo (GhcPass r)]
        return $ flip evalState 0 $ AST.annList & AST.annotation & AST.semanticInfo
                                      !~ (\_ -> get >>= \i -> modify (+1) >> return (importData !! i)) $ res
   where importDefaultLoc = noSemaInfo . AST.ListPos (if List.null imps then "\n" else "") "" "\n" (Just []) . srcSpanEnd
