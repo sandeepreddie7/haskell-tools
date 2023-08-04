@@ -65,3 +65,5 @@ Working on haskell-tools-parser
       To write new refactors, Check reference of built-in-refactorings
       - [Guide for writing refactorings](documentation/development/refactoring-guide.md).
       Add in program options, add the refactoring in ASTRefactors type
+
+      Check https://github.com/juspay/haskell-tools/pull/4 for reference to write refactorings
