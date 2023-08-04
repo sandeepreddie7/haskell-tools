@@ -34,13 +34,19 @@ import qualified Language.Haskell.Tools.AST as AST
 
 trfPattern :: forall n r p . (TransformName n r) => Located (Pat (GhcPass n)) -> Trf (Ann AST.UPattern (Dom (GhcPass r)) RangeStage)
 -- field wildcards are not directly represented in GHC AST
-trfPattern (L l (ConPatIn name (RecCon (HsRecFields flds _)))) | any ((l ==) . getLoc) flds
-  = focusOn l $ do
+trfPattern (ConPatIn x@(L l name) ((RecCon (HsRecFields flds _)))) | any ((l ==) . getLoc) flds
+  = focusOn (l)  $ do
       let (fromWC, notWC) = partition ((l ==) . getLoc) flds
       normalFields <- mapM (trfLocNoSema trfPatternField') notWC
       wildc <- annLocNoSema (tokenLocBack AnnDotdot) (AST.UFieldWildcardPattern <$> annCont (createImplicitFldInfo (unLoc . (\(VarPat _ n) -> n) . unLoc) (map unLoc fromWC)) (pure AST.FldWildcard))
-      annLocNoSema (pure l) (AST.URecPat <$> trfName @n name <*> makeNonemptyList ", " (pure (normalFields ++ [wildc])))
+      annLocNoSema (pure $ l) (AST.URecPat <$> trfName @n (x) <*> makeNonemptyList ", " (pure (normalFields ++ [wildc])))
 trfPattern p = trfLocNoSema trfPattern' (correctPatternLoc p)
+ where
+   -- | Locations for right-associative infix patterns are incorrect in GHC AST
+    correctPatternLoc p@(ConPatIn _ (InfixCon left right))
+      = L (getLoc (correctPatternLoc left) `combineSrcSpans` getLoc (correctPatternLoc right)) p
+    correctPatternLoc p = L (getLoc p) p
+
 
 -- | Locations for right-associative infix patterns are incorrect in GHC AST
 correctPatternLoc :: Located (Pat (GhcPass n)) -> Located (Pat (GhcPass n))
@@ -77,7 +83,10 @@ trfPattern' (SumPat _ pat tag arity)
        AST.UUnboxedSumPat <$> makeList " | " (after AnnOpen) (mapM makePlaceholder locsBefore)
                           <*> trfPattern pat
                           <*> makeList " | " (before AnnClose) (mapM makePlaceholder locsAfter)
-  where makePlaceholder l = annLocNoSema (pure (srcLocSpan l)) (pure AST.UUnboxedSumPlaceHolder)
+  where makePlaceholder l = (annLocNoSema (pure (srcLocSpan l)) (pure AST.UUnboxedSumPlaceHolder))
+trfPattern' (XPat l) = AST.UXPat <$> annLocNoSema (pure (logAndGetLoc l)) (pure $ AST.UWildPat)
+  where
+    logAndGetLoc l = getLoc l
 trfPattern' p = unhandledElement "pattern" p
 
 trfPatternField' :: forall n r p . (TransformName n r) => HsRecField (GhcPass n) (LPat (GhcPass n)) -> Trf (AST.UPatternField (Dom (GhcPass r)) RangeStage)

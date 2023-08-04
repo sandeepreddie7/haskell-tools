@@ -7,7 +7,7 @@ module Language.Haskell.Tools.Rewrite.Create.Stmts where
 
 import Language.Haskell.Tools.AST (UCompStmt(..), UListCompBody(..), UStmt'(..))
 import Language.Haskell.Tools.PrettyPrint.Prepare
-import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe)
+import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe, mkAnnList', mkAnn')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
 -- | Creates a binding statement (@ x <- action @)
@@ -21,6 +21,9 @@ mkExprStmt = mkAnn child . UExprStmt
 -- | Creates a let statement (@ let x = 3; y = 4 @)
 mkLetStmt :: [LocalBind] -> Stmt
 mkLetStmt = mkAnn ("let " <> child) . ULetStmt . mkAnnList (indented list)
+
+mkLetStmt' :: [LocalBind'] -> Stmt'
+mkLetStmt' = mkAnn' ("let " <> child) . ULetStmt . mkAnnList' (indented list)
 
 -- | Creates a recursive binding statement with (@ rec b <- f a c; c <- f b a @)
 mkRecStmt :: [Stmt] -> Stmt

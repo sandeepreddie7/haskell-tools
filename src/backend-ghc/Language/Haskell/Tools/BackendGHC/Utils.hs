@@ -56,6 +56,18 @@ createModuleInfo mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) =
   return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True)
                         (forceElements preludeImports) deps
 
+createModuleInfo' :: ModSummary -> SrcSpan -> [LImportDecl n] -> Trf (Sema.ModuleInfo GhcRn)
+createModuleInfo' mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) = do
+  -- let prelude = (xopt ImplicitPrelude $ ms_hspp_opts mod)
+  --                 && all (\idecl -> ("Prelude" /= (GHC.moduleNameString $ unLoc $ ideclName $ unLoc idecl))
+  --                                     || nameLoc == getLoc idecl) imports
+  -- -- (_, preludeImports) <- if prelude then getImportedNames "Prelude" Nothing else return (ms_mod mod, [])
+  -- deps <- if prelude then return []
+  --                    else return []
+  -- This function (via getInstances) refers the ghc environment,
+  -- we must evaluate the result or the reference may be kept preventing garbage collection.
+  return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True) [] []
+
 -- | Creates a semantic information for a name
 createNameInfo :: IdP n -> Trf (NameInfo n)
 createNameInfo name = do locals <- asks localsInScope
@@ -101,6 +113,25 @@ createImportData (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
                                         p' <- maybe (return Nothing) ((getFromNameUsing @r) getTopLevelId) p
                                         return (PName <$> n' <*> Just p')
 
+-- | Adds semantic information to an impord declaration. See ImportInfo.
+createImportData' :: forall r n . (GHCName r, HsHasName (IdP (GhcPass n))) => GHC.ImportDecl (GhcPass n) -> Trf (ImportInfo (GhcPass r))
+createImportData' (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
+  do (mod,importedNames) <- getImportedNames' (GHC.moduleNameString $ unLoc name) (fmap (unpackFS . sl_fs) pkg)
+  --    names <- liftGhc $ filterM (checkImportVisible declHiding . (^. pName)) importedNames
+  --    -- TODO: only use getFromNameUsing once
+  --    lookedUpNames <- liftGhc $ mapM translatePName $ names
+  --    lookedUpImported <- liftGhc $ mapM ((getFromNameUsing @r) getTopLevelId . (^. pName)) $ importedNames
+  --    deps <- lift $ getDeps mod
+     -- This function (via getInstances) refers the ghc environment,
+     -- we must evaluate the result or the reference may be kept preventing garbage collection.
+     return $ mkImportInfo mod []
+                               []
+                               []
+  -- where translatePName :: PName GhcRn -> Ghc (Maybe (PName r))
+  --       translatePName (PName n p) = do n' <- (getFromNameUsing @r) getTopLevelId n
+  --                                       p' <- maybe (return Nothing) ((getFromNameUsing @r) getTopLevelId) p
+  --                                       return (PName <$> n' <*> Just p')
+
 getDeps :: Module -> Ghc [Module]
 getDeps mod = do
   env <- GHC.getSession
@@ -117,6 +148,19 @@ getDeps mod = do
                              _ -> error $ "getDeps: module not found: " ++ GHC.moduleNameString modName
 
 -- | Get names that are imported from a given import
+getImportedNames' :: String -> Maybe String -> Trf (GHC.Module, [PName GhcRn])
+getImportedNames' name pkg = liftGhc $ do
+  hpt <- hsc_HPT <$> getSession
+  eps <- getSession >>= liftIO . readIORef . hsc_EPS
+  mod <- pure $ GHC.Module (stringToUnitId "") (mkModuleName "") -- findModule (mkModuleName name) (fmap mkFastString pkg)
+  -- load exported names from interface file
+  let ifaceNames = maybe [] mi_exports $ flip lookupModuleEnv mod
+                                       $ eps_PIT eps
+  let homeExports = maybe [] (md_exports . hm_details) (lookupHptByModule hpt mod)
+  -- TODO: Why selectors are added in one case and not added in the other?
+  return (mod, concatMap (availToPName availNames) ifaceNames ++ concatMap (availToPName availNamesWithSelectors) homeExports)
+    where availToPName f a = map (\n -> if n == availName a then PName n Nothing else PName n (Just (availName a))) (f a)
+
 getImportedNames :: String -> Maybe String -> Trf (GHC.Module, [PName GhcRn])
 getImportedNames name pkg = liftGhc $ do
   hpt <- hsc_HPT <$> getSession
@@ -170,6 +214,9 @@ nothing bef aft pos = annNothing . noSemaInfo . OptionalPos bef aft <$> pos
 
 emptyList :: String -> Trf SrcLoc -> Trf (AnnListG e (Dom n) RangeStage)
 emptyList sep ann = AnnListG <$> (noSemaInfo . ListPos "" "" sep Nothing <$> ann) <*> pure []
+
+emptyList' :: String -> Trf SrcLoc -> Trf (AnnListG e (Dom GhcPs) RangeStage)
+emptyList' sep ann = AnnListG <$> (noSemaInfo . ListPos "" "" sep Nothing <$> ann) <*> pure []
 
 -- | Creates a place for a list of nodes with a default place if the list is empty.
 makeList :: String -> Trf SrcLoc -> Trf [Ann e (Dom n) RangeStage] -> Trf (AnnListG e (Dom n) RangeStage)
