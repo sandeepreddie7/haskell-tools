@@ -15,6 +15,7 @@ library
   exposed-modules:     Language.Haskell.Tools.Parser.ParseModule
                      , Language.Haskell.Tools.Parser.SplitModule
                      , Language.Haskell.Tools.Parser.ProgramOptions
+                     , Language.Haskell.Tools.Parser.LetRefactoring
 
   build-depends:       base                       
                      , aeson                     >= 1.0  && < 1.5
@@ -35,6 +36,7 @@ library
                      , haskell-tools-rewrite     >= 1.1  && < 1.2
                      , haskell-tools-prettyprint >= 1.1  && < 1.2
                      , haskell-tools-refactor
+                     , haskell-tools-builtin-refactorings
                      , strict
                      , pretty
                      , Diff

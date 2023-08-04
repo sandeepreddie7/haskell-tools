@@ -57,10 +57,11 @@ getAllNames = do
 
 Refactored code
 
-getAllNames = do let a = "hi"
-                     b = "hello"
-                     c = "mike"
-                 d <- pure "bbb"
-                 let h = "in"
-                     k = "lll"
-                 a <> b <> c <> h <> k -}
+getAllNames = do 
+    let a = "hi"
+        b = "hello"
+        c = "mike"
+    d <- pure "bbb"
+    let h = "in"
+        k = "lll"
+    a <> b <> c <> h <> k -}
