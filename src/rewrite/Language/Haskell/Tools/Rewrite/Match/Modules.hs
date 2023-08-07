@@ -16,6 +16,9 @@ pattern Module filePrags head imps decls  <- Ann _ (UModule filePrags head imps 
 pattern ModuleHead :: ModuleName -> MaybeModulePragma -> MaybeExportSpecs -> ModuleHead
 pattern ModuleHead n pr es <- Ann _ (UModuleHead n pr es)
 
+pattern ModuleHead' :: ModuleName' -> MaybeModulePragma' -> MaybeExportSpecs' -> ModuleHead'
+pattern ModuleHead' n pr es <- Ann _ (UModuleHead n pr es)
+
 -- | A list of export specifications surrounded by parentheses
 pattern ExportSpecs :: ExportSpecList -> ExportSpecs
 pattern ExportSpecs specs <- Ann _ (UExportSpecs specs)

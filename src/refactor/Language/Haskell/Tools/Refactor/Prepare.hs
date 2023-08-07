@@ -209,12 +209,13 @@ parseTyped modSum = withAlteredDynFlags (return . normalizeFlags) $ do
   -- liftIO $ print $ "after parse: " ++ (Module.moduleNameString $ moduleName $ ms_mod ms) ++ " dynflags: " ++ show (moduleNameFS <$> pluginModNames (ms_hspp_opts $ pm_mod_summary  p))
   liftIO $ print $ "ast parse: " ++ (showSDocUnsafe $ ppr $ pm_parsed_source p')
   let pragmas = ((head $ (splitOn "module" (strBufToStr $ srcBuffer))))
-      x       = ((head $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p'))))
-      y       = ((last $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDocUnsafe $ ppr $ pm_parsed_source p'))))
+      x       = ((head $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDoc dyn{pprCols = 1000} $ ppr $ pm_parsed_source p'))))
+      y       = ((last $ (splitOn "import (implicit) qualified GHC.Records.Extra" (showSDoc dyn{pprCols = 1000} $ ppr $ pm_parsed_source p'))))
 
     -- adding 'import qualified GHC.Records.Extra' back to import list without '(implicit)' 
   let fileData = (pragmas ++ x ++ "\nimport qualified GHC.Records.Extra\n" ++ y)
-      newFileData' = replace "hasField r\n    =" "hasField r\n    = undefined --" fileData
+      newFileData'' = replace "hasField r\n    =" "hasField r\n    = undefined --" fileData
+      newFileData' = replace "hasField \n    =" "hasField \n    = undefined --" newFileData''
       newFileData = replace "{-# OPTIONS_GHC -fplugin" "-- {-# OPTIONS_GHC -fplugin" newFileData'
   if isInfixOf "-- {-# OPTIONS_GHC -fplugin" fileData then parseTyped' ms' else
     if isInfixOf "-fplugin" fileData then do

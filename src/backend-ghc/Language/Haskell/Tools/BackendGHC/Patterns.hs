@@ -77,7 +77,10 @@ trfPattern' (SumPat _ pat tag arity)
        AST.UUnboxedSumPat <$> makeList " | " (after AnnOpen) (mapM makePlaceholder locsBefore)
                           <*> trfPattern pat
                           <*> makeList " | " (before AnnClose) (mapM makePlaceholder locsAfter)
-  where makePlaceholder l = annLocNoSema (pure (srcLocSpan l)) (pure AST.UUnboxedSumPlaceHolder)
+  where makePlaceholder l = (annLocNoSema (pure (srcLocSpan l)) (pure AST.UUnboxedSumPlaceHolder))
+-- trfPattern' (XPat l) = AST.UXPat <$> annLocNoSema (pure (logAndGetLoc l)) (pure $ AST.UWildPat)
+--   where
+--     logAndGetLoc l = getLoc l
 trfPattern' p = unhandledElement "pattern" p
 
 trfPatternField' :: forall n r p . (TransformName n r) => HsRecField (GhcPass n) (LPat (GhcPass n)) -> Trf (AST.UPatternField (Dom (GhcPass r)) RangeStage)

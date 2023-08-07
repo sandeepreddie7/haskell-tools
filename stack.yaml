@@ -4,7 +4,6 @@ nix:
   enable: true
   packages: [zlib.dev, zlib.out]
 
-
 ghc-options:
   "$locals": -fwarn-unused-binds -fwarn-unused-matches -fwarn-unused-imports
 
@@ -20,7 +19,7 @@ packages:
   - src/cli
   - src/debug
   - src/daemon
-  # - ../classyplate
+  - src/parser
 
 extra-deps:
   - git: https://github.com/Chaitanya-nair/classyplate.git

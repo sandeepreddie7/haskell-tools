@@ -8,7 +8,7 @@ module Language.Haskell.Tools.Rewrite.Create.Exprs where
 
 import Language.Haskell.Tools.AST
 import Language.Haskell.Tools.PrettyPrint.Prepare
-import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe)
+import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe, mkAnn', mkAnnList')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
 -- * Expressions
@@ -16,6 +16,9 @@ import Language.Haskell.Tools.Rewrite.ElementTypes
 -- | Create a expression for a variable or a data constructor (@ a @)
 mkVar :: Name -> Expr
 mkVar = mkAnn child . UVar
+
+mkVar' :: Name' -> Expr'
+mkVar' = mkAnn' child . UVar
 
 -- | Create a literal expression (@ 42 @)
 mkLit :: Literal -> Expr
@@ -41,6 +44,9 @@ mkLambda pats rhs = mkAnn ("\\" <> child <> " -> " <> child) $ ULambda (mkAnnLis
 mkLet :: [LocalBind] -> Expr -> Expr
 mkLet pats expr = mkAnn ("let " <> child <> " in " <> child) $ ULet (mkAnnList (indented list) pats) expr
 
+mkLet' :: [LocalBind'] -> Expr' -> Expr'
+mkLet' pats expr = mkAnn' ("let " <> child <> " in " <> child) $ ULet (mkAnnList' (indented list) pats) expr
+
 -- | Create a if expression (@ if a then b else c @)
 mkIf :: Expr -> Expr -> Expr -> Expr
 mkIf cond then_ else_ = mkAnn ("if " <> child <> " then " <> child <> " else " <> child) $ UIf cond then_ else_
@@ -56,6 +62,9 @@ mkCase expr cases = mkAnn ("case " <> child <> " of " <> child) $ UCase expr (mk
 -- | Create a do-notation expressions (@ do x <- act1; act2 @)
 mkDoBlock :: [Stmt] -> Expr
 mkDoBlock stmts = mkAnn (child <> " " <> child) $ UDo (mkAnn "do" UDoKeyword) (mkAnnList (indented list) stmts)
+
+mkDoBlock' :: [Stmt'] -> Expr'
+mkDoBlock' stmts = mkAnn' (child <> " " <> child) $ UDo (mkAnn' "do" UDoKeyword) (mkAnnList' (indented list) stmts)
 
 -- | Create a mdo-notation expressions (@ mdo x <- act1; act2 @)
 mkMDoBlock :: [Stmt] -> Expr
