@@ -58,14 +58,6 @@ createModuleInfo mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) =
 
 createModuleInfo' :: ModSummary -> SrcSpan -> [LImportDecl n] -> Trf (Sema.ModuleInfo GhcRn)
 createModuleInfo' mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) = do
-  -- let prelude = (xopt ImplicitPrelude $ ms_hspp_opts mod)
-  --                 && all (\idecl -> ("Prelude" /= (GHC.moduleNameString $ unLoc $ ideclName $ unLoc idecl))
-  --                                     || nameLoc == getLoc idecl) imports
-  -- -- (_, preludeImports) <- if prelude then getImportedNames "Prelude" Nothing else return (ms_mod mod, [])
-  -- deps <- if prelude then return []
-  --                    else return []
-  -- This function (via getInstances) refers the ghc environment,
-  -- we must evaluate the result or the reference may be kept preventing garbage collection.
   return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True) [] []
 
 -- | Creates a semantic information for a name
@@ -117,20 +109,9 @@ createImportData (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
 createImportData' :: forall r n . (GHCName r, HsHasName (IdP (GhcPass n))) => GHC.ImportDecl (GhcPass n) -> Trf (ImportInfo (GhcPass r))
 createImportData' (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
   do (mod,importedNames) <- getImportedNames' (GHC.moduleNameString $ unLoc name) (fmap (unpackFS . sl_fs) pkg)
-  --    names <- liftGhc $ filterM (checkImportVisible declHiding . (^. pName)) importedNames
-  --    -- TODO: only use getFromNameUsing once
-  --    lookedUpNames <- liftGhc $ mapM translatePName $ names
-  --    lookedUpImported <- liftGhc $ mapM ((getFromNameUsing @r) getTopLevelId . (^. pName)) $ importedNames
-  --    deps <- lift $ getDeps mod
-     -- This function (via getInstances) refers the ghc environment,
-     -- we must evaluate the result or the reference may be kept preventing garbage collection.
      return $ mkImportInfo mod []
                                []
                                []
-  -- where translatePName :: PName GhcRn -> Ghc (Maybe (PName r))
-  --       translatePName (PName n p) = do n' <- (getFromNameUsing @r) getTopLevelId n
-  --                                       p' <- maybe (return Nothing) ((getFromNameUsing @r) getTopLevelId) p
-  --                                       return (PName <$> n' <*> Just p')
 
 getDeps :: Module -> Ghc [Module]
 getDeps mod = do

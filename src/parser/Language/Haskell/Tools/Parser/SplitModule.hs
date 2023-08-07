@@ -21,7 +21,6 @@ import Module as GHC hiding (mkModuleName)
 import InstEnv as GHC
 import Unify as GHC
 import Type as GHC
--- import Name as GHC
 import Var as GHC
 import UniqSupply as GHC
 import Unique as GHC
@@ -66,6 +65,7 @@ import qualified Data.HashMap.Strict as HM
 import System.IO
 import Control.Monad
 import qualified Data.Aeson as A
+import Data.List.Extra (replace)
 
 import Language.Haskell.Tools.AST.Representation.Binds (ULocalBind)
 
@@ -95,10 +95,10 @@ getFunctionDepOfModule moduleAST = do
                                                                     Nothing -> acc) funs whereDeps
 
 suffixToBeAdded :: String
-suffixToBeAdded = ".Transaction"
+suffixToBeAdded = "Split"
 
-newModPath :: String
-newModPath = "/home/chaitanya/Desktop/work/euler-api-txns/euler-x/src-generated/Product/OLTP/Transaction/Transaction"
+moduleSuffix :: String -> String
+moduleSuffix modulePath = replace modulePath ".hs" ("/" ++ suffixToBeAdded) -- moduleName to be added
 
 splitAndWrite :: String -> String -> String -> String -> IO Int
 splitAndWrite modulePath moduleName groupedFunctionsString modFunReferenceString = do
@@ -123,8 +123,8 @@ writeBackGroupedModules modulePath moduleName resolveDeps moduleAST groupedFunct
                                 in (.=) modDecl (AST.AnnListG annot decls) moduleAST
     writeFile modulePath  (prettyPrint newModDeclForRoot)
     foldM (\acc x -> do
-        changedModName <- liftIO $ (!~) (biplateRef) (changeModName (suffixToBeAdded ++ (show acc))) (x)
-        (writeFile (newModPath ++ (show acc) ++ ".hs") (prettyPrint changedModName))
+        changedModName <- liftIO $ (!~) (biplateRef) (changeModName (("." ++ suffixToBeAdded) ++ (show acc))) (x)
+        (writeFile ((moduleSuffix modulePath) ++ (show acc) ++ ".hs") (prettyPrint changedModName))
         pure $ (acc + 1)) 0 newModDecl
 
     where

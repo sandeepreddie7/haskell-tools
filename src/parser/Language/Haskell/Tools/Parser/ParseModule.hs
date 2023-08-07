@@ -6,24 +6,18 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies #-}
 module Language.Haskell.Tools.Parser.ParseModule where
   
--- import Retrie
 import Debug.Trace
 import Data.Data
 import GHC hiding (loadModule)
 import qualified GHC
 import Outputable (Outputable(..), showSDocUnsafe, cat)
--- import GHC.Unit.Module.Graph (mgModSummaries')
 import GHC.Paths ( libdir )
 import Control.Monad
--- import DynFlags
 import Control.Monad.IO.Class
 import qualified Data.HashMap.Strict as HM
--- import AliasedTypes (ModuleMeta(..))
 import Data.List
 import Data.List.Extra (splitOn,trim,replace, cons)
 import GHC.LanguageExtensions
--- import qualified Language.Haskell.GHC.ExactPrint as E
--- import qualified ProjectModuleGraph
 import Control.Exception
 import Data.Functor
 import Data.Maybe
@@ -125,8 +119,6 @@ loadModule workingDir moduleName
        void $ load (LoadUpTo $ mkModuleName moduleName)
        getModSummary $ mkModuleName moduleName         
 
-pp = "/home/chaitanya/Desktop/work/"
-
 foldLocs :: [SrcSpan] -> SrcSpan
 foldLocs = foldl combineSrcSpans noSrcSpan
 
@@ -134,6 +126,7 @@ moduleParser :: String -> String -> IO ((Ann AST.UModule (Dom GhcPs) SrcTemplate
 moduleParser modulePath moduleName = do
     print modulePath
     dflags <- runGhc (Just libdir) getSessionDynFlags
+    pp <- getCurrentDirectory
     modSum <- runGhc (Just libdir) $ loadModule (if "src-generated" `isInfixOf` modulePath then pp <> "euler-api-txns/euler-x/src-generated/" else if "src-extras" `isInfixOf` modulePath then pp <> "euler-api-txns/euler-x/src-extras/" else pp <> "euler-api-txns/euler-x/src/") moduleName
     print $ showSDocUnsafe $ ppr modSum
     y <- runGhc (Just libdir) $ parseModule modSum
