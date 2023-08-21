@@ -67,7 +67,6 @@ import System.IO
 import Control.Monad
 import qualified Data.Aeson as A
 
-import Language.Haskell.Tools.AST.Representation.Binds (ULocalBind)
 
 
 
