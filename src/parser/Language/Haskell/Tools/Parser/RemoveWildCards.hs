@@ -24,8 +24,6 @@ removeWildCards modulePath moduleName = do
     newAST <- (!~) (biplateRef) (traverseOverUValBind) (moduleASTMod)
     writeFile (modulePath <> (replace "." "/" moduleName) <> ".hs") (prettyPrint newAST)
 
--- fromList [("txnDetail",("st","txnDetail")),("r",("st","refund"))]
-
 changeAsPat :: Ann UMatchLhs (Dom GhcPs) SrcTemplateStage -> IO (Ann UMatchLhs (Dom GhcPs) SrcTemplateStage)
 changeAsPat expr@(Ann _ (UNormalLhs name (AnnListG _ args))) = pure $
    let modifiedArgs = if length args == 1
@@ -47,7 +45,6 @@ changeAsPat expr = pure expr
 traverseOverUValBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> IO (Ann UDecl (Dom GhcPs) SrcTemplateStage)
 traverseOverUValBind expr@(Ann _ (UValueBinding (FunctionBind' ex))) = do
     !wildCardList <- mapMaybeM (wildCardsRefactor) (ex ^? biplateRef)
-    print (HM.unions wildCardList)
     let newList = lookUpAndConcat (HM.unions wildCardList)
     print newList
     newAST <- (!~) (biplateRef) (removeWildPats) (expr)
