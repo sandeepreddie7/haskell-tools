@@ -16,6 +16,7 @@ library
                      , Language.Haskell.Tools.Parser.SplitModule
                      , Language.Haskell.Tools.Parser.ProgramOptions
                      , Language.Haskell.Tools.Parser.LetRefactoring
+                     , Language.Haskell.Tools.Parser.RemoveWildCards
 
   build-depends:       base                       
                      , aeson                     >= 1.0  && < 1.5
