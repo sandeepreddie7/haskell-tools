@@ -101,7 +101,7 @@ library
                      , ghc-paths                 >= 0.1   && < 0.2
                      , references                >= 0.3.2 && < 1.0
                      , network                   
-                     , Diff                      >= 0.3   && < 0.4
+                     , Diff                      
                      , Cabal                    
                      , pretty                    >= 1.1   && < 1.2
                      , optparse-applicative     

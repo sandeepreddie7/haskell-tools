@@ -58,6 +58,9 @@ mkRecPat name flds = mkAnn (child <> "{ " <> child <> " }") $ URecPat name (mkAn
 mkAsPat :: Name -> Pattern -> Pattern
 mkAsPat name pat = mkAnn (child <> "@" <> child) $ UAsPat name pat
 
+mkAsPat' :: Name' -> Pattern' -> Pattern'
+mkAsPat' name pat = mkAnn' (child <> "@" <> child) $ UAsPat name pat
+
 -- | Wildcard pattern: (@ _ @)
 mkWildPat :: Pattern
 mkWildPat = mkAnn "_" UWildPat

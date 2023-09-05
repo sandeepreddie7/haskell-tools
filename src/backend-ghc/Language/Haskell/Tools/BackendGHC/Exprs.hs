@@ -147,10 +147,10 @@ trfExpr' (ExplicitList _ _ exprs) = AST.UList <$> trfAnnList' ", " trfExpr exprs
 -- trfExpr' (ExplicitPArr _ exprs) = AST.UParArray <$> trfAnnList' ", " trfExpr exprs
 trfExpr' (RecordCon _ name fields) = AST.URecCon <$> trfName @n name <*> trfFieldInits fields
 trfExpr' (RecordUpd _ expr fields) = AST.URecUpdate <$> trfExpr expr <*> trfAnnList ", " trfFieldUpdate fields
--- trfExpr' (ExprWithTySig _ expr typ) =
---   let g :: LHsType (GhcPass (NoGhcTcPass p)) -> LHsType (GhcPass p)
---       g = unsafeCoerce
---     in AST.UTypeSig <$> trfExpr expr <*> trfType (g $ hsib_body $ hswc_body typ) --TODO:
+trfExpr' (ExprWithTySig _ expr typ) =
+  let g :: LHsType (GhcPass (NoGhcTcPass (NoGhcTcPass n)))-> LHsType (GhcPass n)
+      g = unsafeCoerce
+    in AST.UTypeSig <$> trfExpr expr <*> trfType (g $ hsib_body $ hswc_body typ) --TODO:
 trfExpr' (ArithSeq _ _ (From from)) = AST.UEnum <$> trfExpr from <*> nothing "," "" (before AnnDotdot)
                                                                 <*> nothing "" "" (before AnnCloseS)
 trfExpr' (ArithSeq _ _ (FromThen from step))
