@@ -41,7 +41,7 @@ import Language.Haskell.Tools.Refactor.Builtin (builtinRefactorings)
 import Data.Either
 import DynamicLoading (initializePlugins)
 import System.IO.Strict as StrictIO (hGetContents)
-import Data.Algorithm.Diff (Diff(..), getGroupedDiff)
+import Data.Algorithm.Diff --(Diff(..), getGroupedDiff)
 import Data.Algorithm.DiffContext (prettyContextDiff, getContextDiff)
 import System.IO
 import System.Directory
