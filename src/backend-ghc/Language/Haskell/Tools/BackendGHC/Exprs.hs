@@ -170,10 +170,10 @@ trfExpr' (HsSpliceE _ splice) = AST.USplice <$> trfSplice splice
 trfExpr' (HsRnBracketOut _ br _) = AST.UBracketExpr <$> annContNoSema (trfBracket' br)
 trfExpr' (HsProc _ pat cmdTop) = AST.UProc <$> trfPattern pat <*> trfCmdTop cmdTop
 trfExpr' (HsStatic _ expr) = AST.UStaticPtr <$> trfExpr expr
--- trfExpr' (HsAppType _ expr typ) =
---     let g :: LHsType (GhcPass (NoGhcTcPass p)) -> LHsType (GhcPass p)
---         g = unsafeCoerce
---     in AST.UExplTypeApp <$> trfExpr expr <*> trfType (g $ hswc_body typ) --TODO:
+trfExpr' (HsAppType _ expr typ) =
+    let g :: LHsType (GhcPass (NoGhcTcPass n)) -> LHsType (GhcPass n)
+        g = unsafeCoerce
+    in AST.UExplTypeApp <$> trfExpr expr <*> trfType (g $ hswc_body typ) --TODO:
 trfExpr' (HsSCC _ _ lit expr) = AST.UExprPragma <$> pragma <*> trfExpr expr
   where pragma = do pragLoc <- tokensLoc [AnnOpen, AnnClose]
                     focusOn pragLoc $ annContNoSema (AST.USccPragma <$> annLocNoSema (mappend <$> tokenLoc AnnValStr <*> tokenLocBack AnnVal) (trfText' lit))

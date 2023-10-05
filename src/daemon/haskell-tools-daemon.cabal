@@ -150,7 +150,7 @@ test-suite haskell-tools-daemon-tests
   build-depends:       base                       
                      , HUnit                     >= 1.5  && < 1.7
                      , ghc                        
-                     , tasty                     >= 0.11 && < 1.2
+                     , tasty                     
                      , tasty-hunit               >= 0.9  && < 0.11
                      , directory                 >= 1.2  && < 1.4
                      , process                   >= 1.6  && < 1.7

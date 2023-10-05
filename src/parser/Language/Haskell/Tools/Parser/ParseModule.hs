@@ -59,8 +59,7 @@ initGhcFlags' needsCodeGen errorsSuppressed = do
              , ghcMode = CompManager
              , packageFlags = ExposePackage "template-haskell" (PackageArg "template-haskell") (ModRenaming True []) : packageFlags dflags
              }) [
-                                BangPatterns
-                                ,BlockArguments
+                                BlockArguments
                                 ,ConstraintKinds
                                 ,DataKinds
                                 ,DeriveAnyClass
@@ -102,7 +101,19 @@ initGhcFlags' needsCodeGen errorsSuppressed = do
                                 ,TypeSynonymInstances
                                 ,UndecidableInstances
                                 ,ViewPatterns
-                                ,GHC.LanguageExtensions.UnicodeSyntax
+                                ,BangPatterns
+                                ,AllowAmbiguousTypes
+                                ,UnicodeSyntax
+                                ,StandaloneDeriving
+                                ,EmptyDataDecls
+                                ,FunctionalDependencies
+                                ,PartialTypeSignatures
+                                -- ,NamedFieldPuns
+                                -- ,NoImplicitPrelude
+                                ,Strict
+                                ,EmptyDataDeriving
+                                ,PolyKinds
+                                ,ExistentialQuantification 
                           ]
 
 initGhcFlagsForTest :: Ghc ()
