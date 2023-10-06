@@ -15,7 +15,6 @@ import System.Directory (doesDirectoryExist, getDirectoryContents)
 import System.FilePath (takeExtension, (</>))
 import Control.Monad (forM)
 import Control.Exception
--- Helpers
 
 -- NOTE: Looking for only types file
 isHaskellFile :: FilePath -> Bool
@@ -57,13 +56,11 @@ getAllTypesInProject dir = do
                             Nothing -> v 
                 in HM.insert k val acc
             ) hmg $ HM.toList hm
--- (if "src-generated" `isInfixOf` modulePath then pp Prelude.<> "euler-api-txns/euler-x/src-generated/" else if "src-extras" `isInfixOf` modulePath then pp Prelude.<> "euler-api-txns/euler-x/src-extras/" else pp Prelude.<> "euler-api-txns/euler-x/src/") moduleName
 
 parseAndGenerateBuckets :: String -> String -> IO (HM.HashMap String [String])
 parseAndGenerateBuckets modulePath moduleName = do
     moduleAST <- moduleParser modulePath moduleName
     pure $ HM.fromList $ map (BI.second nub) $ mapMaybe getTypeData (moduleAST ^? biplateRef)
-    -- 
 
 getTypeData :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe (String,[String])
 -- getTypeData expr@(Ann _ (UTypeDecl declHead declType)) = (\x -> Just (x,getAllField declType)) =<< getNameFromDeclHead declHead
