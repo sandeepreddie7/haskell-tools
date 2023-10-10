@@ -21,22 +21,22 @@ library
 
   build-depends:       base                       
                      , aeson                     
-                     , mtl                       
-                     , uniplate                  
-                     , ghc-paths                 
-                     , containers                
-                     , directory                 
-                     , transformers              
-                     , references                       
-                     , split                     
-                     , filepath                  
+                     , mtl                       >= 2.2  && < 2.3
+                     , uniplate                  >= 1.6  && < 1.7
+                     , ghc-paths                 >= 0.1  && < 0.2
+                     , containers                >= 0.5  && < 0.7
+                     , directory                 >= 1.2  && < 1.4
+                     , transformers              >= 0.5  && < 0.6
+                     , references                 
+                     , split                     >= 0.2  && < 0.3
+                     , filepath                  >= 1.4  && < 1.5
                      , template-haskell           
                      , ghc                        
                      , Cabal                      
-                     , haskell-tools-ast        
+                     , haskell-tools-ast         >= 1.1  && < 1.2
                      , haskell-tools-backend-ghc
-                     , haskell-tools-rewrite    
-                     , haskell-tools-prettyprint
+                     , haskell-tools-rewrite     >= 1.1  && < 1.2
+                     , haskell-tools-prettyprint >= 1.1  && < 1.2
                      , haskell-tools-refactor
                      , haskell-tools-builtin-refactorings
                      , strict
@@ -52,10 +52,10 @@ library
 executable ht-parse
   ghc-options:         -rtsopts
   build-depends:       base                       
-                     , split                    
-                     , mtl                     
-                     , directory              
-                     , filepath                
+                     , split                     >= 0.2 && < 0.3
+                     , mtl                       >= 2.2 && < 2.3
+                     , directory                 >= 1.2  && < 1.4
+                     , filepath                  >= 1.4  && < 2.0 
                      , optparse-applicative      
                      , haskell-tools-parser
   hs-source-dirs:      exe
