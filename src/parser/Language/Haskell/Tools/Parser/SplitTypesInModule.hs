@@ -11,10 +11,12 @@ import Language.Haskell.Tools.Parser.ParseModule
 import qualified Data.Aeson as A
 import qualified Data.Bifunctor as BI
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
 import System.Directory (doesDirectoryExist, getDirectoryContents)
 import System.FilePath (takeExtension, (</>))
 import Control.Monad (forM)
 import Control.Exception
+import Data.List (foldl')
 
 -- NOTE: Looking for only types file
 isHaskellFile :: FilePath -> Bool
@@ -46,7 +48,7 @@ getAllTypesInProject dir = do
           (\(err :: SomeException) -> print (displayException err) *> pure Nothing)
     print (moduleNames)
     res <- mapM (\x -> parseAndGenerateBuckets dir x) $ catMaybes moduleNames
-    writeFile ("dump.json") (show $ A.encode $ Data.List.foldl' (\acc hm -> addHashMap acc hm) HM.empty $ res) 
+    writeFile ("types_graph.json") (show $ A.encode $ Data.List.foldl' (\acc hm -> addHashMap acc hm) HM.empty $ res) 
     where 
         addHashMap hmg hm = 
             Data.List.foldl' (\acc (k,v) -> 
@@ -56,6 +58,41 @@ getAllTypesInProject dir = do
                             Nothing -> v 
                 in HM.insert k val acc
             ) hmg $ HM.toList hm
+
+findConnectedComponents :: HM.HashMap String [String] -> [[String]]
+findConnectedComponents graph =
+  let allNodes = HM.keys graph
+      visitedNodes = HS.empty
+      (_, components) = foldl (processNode graph) (visitedNodes, []) allNodes
+  in components
+ where
+    processNode :: HM.HashMap String [String] -> (HS.HashSet String, [[String]]) -> String -> (HS.HashSet String, [[String]])
+    processNode graph (visitedNodes, components) node
+      | HS.member node visitedNodes = (visitedNodes, components)
+      | otherwise =
+        let connectedComponent = dfsConnectedComponent graph node visitedNodes
+        in (visitedNodes `HS.union` HS.fromList connectedComponent, connectedComponent : components)
+
+    dfsConnectedComponent :: HM.HashMap String [String] -> String -> HS.HashSet String -> [String]
+    dfsConnectedComponent graph currentNode visitedNodes =
+      case HM.lookup currentNode graph of
+        Just neighbors ->
+          let unvisitedNeighbors = filter (\x -> not $ x `HS.member` visitedNodes) neighbors
+          in currentNode : concatMap (\neighbor -> dfsConnectedComponent graph neighbor (HS.insert neighbor visitedNodes)) unvisitedNeighbors
+        Nothing -> [currentNode]
+
+splitOneTypeFileIntoMany :: String -> String -> IO [[[String]]]
+splitOneTypeFileIntoMany modulePath moduleName = do
+    typeData <- parseAndGenerateBuckets modulePath moduleName
+    let components = findConnectedComponents typeData
+        minNoOfFiles = ((length components) `div` 25)
+    pure $ splitIntoNSublists minNoOfFiles $ components
+    where
+        splitIntoNSublists :: Int -> [a] -> [[a]]
+        splitIntoNSublists _ [] = []
+        splitIntoNSublists n list =
+          let (sublist, rest) = splitAt n list
+          in sublist : splitIntoNSublists n rest
 
 parseAndGenerateBuckets :: String -> String -> IO (HM.HashMap String [String])
 parseAndGenerateBuckets modulePath moduleName = do
