@@ -101,9 +101,9 @@ packages:
   original:
     hackage: parsec-3.1.14.0
 - completed:
-    hackage: warp-3.3.19@sha256:c6a47029537d42844386170d732cdfe6d85b2f4279bbaefdd9b50caff6faeebb,10910
+    hackage: warp-3.3.19@sha256:c35fdceffc8069e7c38f5b7e7066af5e660871ce39ace4c604e045c504fbd85d,11204
     pantry-tree:
-      sha256: 99ff839445ba2c9e29a294b45904e3f4575336c7d2b4504ce310d611661c761d
+      sha256: d5d83196e618597b4af1c54b56b58cc277a5695b4a4887f297a3bbba980f96bf
       size: 3973
   original:
     hackage: warp-3.3.19

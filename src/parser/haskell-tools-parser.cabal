@@ -17,9 +17,10 @@ library
                      , Language.Haskell.Tools.Parser.ProgramOptions
                      , Language.Haskell.Tools.Parser.LetRefactoring
                      , Language.Haskell.Tools.Parser.RemoveWildCards
+                     , Language.Haskell.Tools.Parser.SplitTypesInModule
 
   build-depends:       base                       
-                     , aeson                     >= 1.0  && < 1.5
+                     , aeson                     
                      , mtl                       >= 2.2  && < 2.3
                      , uniplate                  >= 1.6  && < 1.7
                      , ghc-paths                 >= 0.1  && < 0.2
@@ -54,7 +55,7 @@ executable ht-parse
                      , split                     >= 0.2 && < 0.3
                      , mtl                       >= 2.2 && < 2.3
                      , directory                 >= 1.2  && < 1.4
-                     , filepath                  >= 1.4  && < 2.0
+                     , filepath                  >= 1.4  && < 2.0 
                      , optparse-applicative      
                      , haskell-tools-parser
   hs-source-dirs:      exe
