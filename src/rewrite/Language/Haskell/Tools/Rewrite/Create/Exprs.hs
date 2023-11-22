@@ -28,6 +28,9 @@ mkLit = mkAnn child . ULit
 mkInfixApp :: Expr -> Operator -> Expr -> Expr
 mkInfixApp lhs op rhs = mkAnn (child <> " " <> child <> " " <> child) $ UInfixApp lhs op rhs
 
+mkInfixAppForRanged :: Expr' -> Operator' -> Expr' -> Expr'
+mkInfixAppForRanged lhs op rhs = mkAnn' (child <> " " <> child <> " " <> child) $ UInfixApp lhs op rhs
+
 -- | Create a prefix operator application expression (@ -x @)
 mkPrefixApp :: Operator -> Expr -> Expr
 mkPrefixApp op rhs = mkAnn (child <> child) $ UPrefixApp op rhs
@@ -35,6 +38,9 @@ mkPrefixApp op rhs = mkAnn (child <> child) $ UPrefixApp op rhs
 -- | Create a function application expression (@ f 4 @)
 mkApp :: Expr -> Expr -> Expr
 mkApp f e = mkAnn (child <> " " <> child) (UApp f e)
+
+mkAppForRanged :: Expr' -> Expr' -> Expr'
+mkAppForRanged f e = mkAnn' (child <> " " <> child) (UApp f e)
 
 -- | Create a lambda expression (@ \\a b -> a + b @)
 mkLambda :: [Pattern] -> Expr -> Expr

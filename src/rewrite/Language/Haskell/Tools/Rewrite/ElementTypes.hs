@@ -339,6 +339,7 @@ type Literal = Ann ULiteral IdDom SrcTemplateStage
 
 -- | A definition that functions as an operator
 type Operator = Ann UOperator IdDom SrcTemplateStage
+type Operator' = Ann UOperator (Dom GhcPs) SrcTemplateStage
 
 -- | A definition that functions as a name
 type Name = Ann UName IdDom SrcTemplateStage
