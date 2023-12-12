@@ -1,0 +1,44 @@
+name: Haskell
+
+on:
+  push:
+    branches:
+      - '*'         # matches every branch that doesn't contain a '/'
+      - '*/*'       # matches every branch containing a single '/'
+      - '**'
+  pull_request:
+    branches:
+      - '*'         # matches every branch that doesn't contain a '/'
+      - '*/*'       # matches every branch containing a single '/'
+      - '**'
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: cachix/install-nix-action@v20
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: DeterminateSystems/magic-nix-cache-action@v2
+      - run: nix build
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: haskell-tools-ubuntu
+          path: |
+            target/release/**
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: cachix/install-nix-action@v20
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: DeterminateSystems/magic-nix-cache-action@v2
+      - run: target/release/nixv build
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: haskell-tools-macos
+          path: |
+            target/release/**
