@@ -39,6 +39,8 @@ mkAnn' temp = Ann (fromTemplate temp)
 wrapperAnn :: e IdDom SrcTemplateStage -> Ann e IdDom SrcTemplateStage
 wrapperAnn = mkAnn child
 
+wrapperAnn' :: e (Dom GhcPs) SrcTemplateStage -> Ann e (Dom GhcPs) SrcTemplateStage
+wrapperAnn' = mkAnn' child
 -- | Transforms the list of elements to an AnnListG with the given source template.
 mkAnnList :: ListInfo SrcTemplateStage -> [Ann e IdDom SrcTemplateStage] -> AnnList e
 mkAnnList temp = AnnListG (fromTemplate temp)

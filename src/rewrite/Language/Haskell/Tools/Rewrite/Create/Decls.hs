@@ -83,6 +83,10 @@ mkRecordConDecl :: Name -> [FieldDecl] -> ConDecl
 mkRecordConDecl name fields
   = mkAnn (child <> child <> child <> " { " <> child <> " }") $ URecordDecl emptyList noth name (mkAnnList (separatedBy ", " list) fields)
 
+mkRecordConDecl' :: Name' -> [FieldDecl'] -> ConDecl'
+mkRecordConDecl' name fields
+  = mkAnn' (child <> child <> child <> " { " <> child <> " }") $ URecordDecl emptyList' noth' name (mkAnnList' (separatedBy ", " list) fields)
+
 -- | Creates an infix data constructor (@ t1 :+: t2 @)
 mkInfixConDecl :: Type -> Operator -> Type -> ConDecl
 mkInfixConDecl lhs op rhs = mkAnn (child <> child <> child <> " " <> child <> " " <> child) $ UInfixConDecl emptyList noth lhs op rhs
@@ -90,6 +94,9 @@ mkInfixConDecl lhs op rhs = mkAnn (child <> child <> child <> " " <> child <> " 
 -- | Creates a field declaration (@ fld :: Int @) for a constructor
 mkFieldDecl :: [Name] -> Type -> FieldDecl
 mkFieldDecl names typ = mkAnn (child <> " :: " <> child) $ UFieldDecl (mkAnnList (separatedBy ", " list) names) typ
+
+mkFieldDecl' :: [Name'] -> Type' -> FieldDecl'
+mkFieldDecl' names typ = mkAnn' (child <> " :: " <> child) $ UFieldDecl (mkAnnList' (separatedBy ", " list) names) typ
 
 -- | Creates a deriving clause following a data type declaration. (@ deriving Show @ or @ deriving (Show, Eq) @)
 mkDeriving :: [InstanceHead] -> Deriving

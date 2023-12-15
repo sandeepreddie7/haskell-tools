@@ -38,7 +38,7 @@ library
                      , Language.Haskell.Tools.Rewrite.Match.Patterns
                      , Language.Haskell.Tools.Rewrite.Match.Names
                      , Language.Haskell.Tools.Rewrite.Match.TH
-  other-modules:       Language.Haskell.Tools.Rewrite.Create.Utils
+                     , Language.Haskell.Tools.Rewrite.Create.Utils 
   build-depends:       base                       
                      , mtl                       >= 2.2  && < 2.3
                      , containers                >= 0.5  && < 0.7

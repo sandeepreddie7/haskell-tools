@@ -14,7 +14,7 @@ import Data.List
 import GHC.Hs.Expr (HsSplice(..))
 import GHC.Hs.Lit as GHC (HsOverLit(..))
 import GHC.Hs.Pat as GHC
-import GHC.Hs.Types as GHC (HsConDetails(..), hswc_body, hsib_body,LHsType)
+import GHC.Hs.Types as GHC (HsConDetails(..), hswc_body, hsib_body, LHsType)
 import Language.Haskell.Tools.BackendGHC.GHCUtils (getFieldOccName)
 import SrcLoc as GHC
 import Control.Monad.Reader

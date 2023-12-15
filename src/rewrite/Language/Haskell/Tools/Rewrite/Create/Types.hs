@@ -29,9 +29,15 @@ mkTypeVar' = mkTypeVar . mkUnqualName'
 mkCtxType :: Context -> Type -> Type
 mkCtxType ctx t = mkAnn (child <> " " <> child) (UTyCtx ctx t)
 
+mkCtxTypeForRanged :: Context' -> Type' -> Type'
+mkCtxTypeForRanged ctx t = mkAnn' (child <> " " <> child) (UTyCtx ctx t)
+
 -- | Function types (@ a -> b @)
 mkFunctionType :: Type -> Type -> Type
 mkFunctionType at rt = mkAnn (child <> " -> " <> child) (UTyFun at rt)
+
+mkFunctionTypeForRanged :: Type' -> Type' -> Type'
+mkFunctionTypeForRanged at rt = mkAnn' (child <> " -> " <> child) (UTyFun at rt)
 
 -- | Tuple types (@ (a,b) @)
 mkTupleType :: [Type] -> Type
@@ -53,6 +59,9 @@ mkParArrayType = mkAnn ("[:" <> child <> ":]") . UTyParArray
 mkTypeApp :: Type -> Type -> Type
 mkTypeApp ft at = mkAnn (child <> " " <> child) (UTyApp ft at)
 
+mkTypeAppForRanged :: Type' -> Type' -> Type'
+mkTypeAppForRanged ft at = mkAnn' (child <> " " <> child) (UTyApp ft at)
+
 -- | Infix type constructor (@ (a <: b) @)
 mkInfixTypeApp :: Type -> Operator -> Type -> Type
 mkInfixTypeApp left op right = mkAnn (child <> " " <> child <> " " <> child) (UTyInfix left op right)
@@ -65,6 +74,9 @@ mkParenType = mkAnn ("(" <> child <> ")") . UTyParen
 mkTypeVar :: Name -> TyVar
 mkTypeVar n = mkAnn (child <> child) (UTyVarDecl n noth)
 
+mkTypeVarForRanged :: Name' -> TyVar'
+mkTypeVarForRanged n = mkAnn' (child <> child) (UTyVarDecl n noth')
+
 -- | Creates a type variable with kind specification (@ t :: * @)
 mkKindedTypeVar :: Name -> Kind -> TyVar
 mkKindedTypeVar n k = mkAnn (child <> child) (UTyVarDecl n (justVal (mkKindConstraint k)))
@@ -72,6 +84,9 @@ mkKindedTypeVar n k = mkAnn (child <> child) (UTyVarDecl n (justVal (mkKindConst
 -- | Type variable or constructor (@ a @)
 mkVarType :: Name -> Type
 mkVarType = wrapperAnn . UTyVar
+
+mkVarTypeForRanged :: Name' -> Type'
+mkVarTypeForRanged = wrapperAnn' . UTyVar
 
 -- | Type with explicit kind signature (@ a :: * @)
 mkKindedType :: Type -> Kind -> Type
@@ -142,6 +157,9 @@ mkPromotedUnitType = mkAnn child $ UTyPromoted $ mkAnn "()" UPromotedUnit
 mkContext :: Assertion -> Context
 mkContext = mkAnn (child <> " =>") . UContext
 
+mkContextForRanged :: Assertion' -> Context'
+mkContextForRanged = mkAnn' (child <> " =>") . UContext
+
 -- * Generation of assertions
 
 -- | Class assertion (@Cls x@)
@@ -156,6 +174,9 @@ mkInfixAssert left op right = mkAnn (child <> " " <> child <> " " <> child) $ UI
 -- | Creates an assertion for implicit parameter binding (@ ?cmp :: a -> a -> Bool @)
 mkImplicitAssert :: Name -> Type -> Assertion
 mkImplicitAssert n t = mkAnn (child <> " :: " <> child) $ UImplicitAssert n t
+
+mkImplicitAssertForRanged :: Name' -> Type' -> Assertion'
+mkImplicitAssertForRanged n t = mkAnn' (child <> " :: " <> child) $ UImplicitAssert n t
 
 -- | Creates a list of assertions (@ (Eq a, Show a) @)
 mkTupleAssertion :: [Assertion] -> Assertion
