@@ -18,7 +18,7 @@ import Control.Monad.Extra
 import qualified Data.HashMap.Strict as HM
 import Data.Char (toLower, isUpper)
 import Data.List.Extra (replace)
-import Language.Haskell.Tools.Parser.SplitModule (getFunctionDepOfModule')
+import Language.Haskell.Tools.Parser.RemoveUnusedFuns (getFunctionDepOfModule')
 import Language.Haskell.Tools.Refactor as HT
 import Control.Applicative ((<|>))
 import System.Directory (doesPathExist)

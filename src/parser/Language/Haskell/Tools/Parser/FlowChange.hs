@@ -61,7 +61,7 @@ import Control.Monad
 import qualified Data.Aeson as A
 import Data.List.Extra (replace)
 import Shelly
-import Language.Haskell.Tools.Parser.SplitModule (getFunctionDepOfModule')
+import Language.Haskell.Tools.Parser.RemoveUnusedFuns (getFunctionDepOfModule')
 import qualified Language.Haskell.Tools.Parser.GetFunctionBranching as GFT
 import Control.Applicative ((<|>))
 import Language.Haskell.Tools.Refactor as HT
@@ -77,6 +77,7 @@ data FunctionModified =
       deleted :: [String]
     , modified :: [String]
     , added :: [String]
+    , modName :: String
     }
   deriving (Show)
 
@@ -86,25 +87,26 @@ data FunctionModified =
 --     "git diff commit1 commit2"
 
 -- defaultFunctionModified =
---     FunctionModified [] [] []
+--     FunctionModified "defaultFile" [] [] []
 
-addFunctionModifed funMod funMod2 = FunctionModified (deleted funMod ++ deleted funMod2) (modified funMod ++ modified funMod2) (added funMod ++ added funMod2)
+-- NOTE: Ideally we should add same module functions in FunctionModified
+addFunctionModifed funMod funMod2 = FunctionModified (deleted funMod ++ deleted funMod2) (modified funMod ++ modified funMod2) (added funMod ++ added funMod2) (modName funMod)
  
 compareFile1 = "Euler.API.Gateway.Gateway.Adyen.Transforms.Refund"
 compareFile2 = "Euler.API.Gateway.Gateway.Adyen.Transforms.ModRefund"
 
-compareASTForFuns :: IO ()
-compareASTForFuns = do
-    moduleASTOld <- moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src" compareFile1
-    moduleASTNew <- moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src" compareFile2
+compareASTForFuns :: String -> String -> IO ()
+compareASTForFuns filePath moduleName' = do
+    moduleASTOld <- moduleParser filePath moduleName'
+    moduleASTNew <- moduleParser filePath moduleName'
     let oldFuns = HM.fromList $ getAllFunctions moduleASTOld
     let newFuns = HM.fromList $ getAllFunctions moduleASTNew
     let removed = HM.keys $ HM.difference newFuns oldFuns
     -- print removed
     let !y = HM.foldlWithKey (\acc k val ->
                 case HM.lookup k newFuns of
-                Just newVal -> if ((show val) == (show newVal)) then acc else addFunctionModifed acc (FunctionModified [] [k] [])
-                Nothing -> addFunctionModifed acc (FunctionModified [k] [] []) ) (FunctionModified [] [] removed) oldFuns
+                Just newVal -> if ((show val) == (show newVal)) then acc else addFunctionModifed acc (FunctionModified [] [k] [] moduleName')
+                Nothing -> addFunctionModifed acc (FunctionModified [k] [] [] moduleName') ) (FunctionModified [] [] removed moduleName') oldFuns
     print y
 
 traverseOverUValBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe (String, Ann UDecl (Dom GhcPs) SrcTemplateStage)
