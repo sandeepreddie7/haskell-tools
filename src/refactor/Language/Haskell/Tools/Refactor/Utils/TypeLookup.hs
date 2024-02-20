@@ -19,9 +19,6 @@ import Language.Haskell.Tools.Rewrite as AST
 import Language.Haskell.Tools.Refactor.Utils.NameLookup as AST
 import Language.Haskell.Tools.Refactor.Utils.Maybe as AST
 
-instance Eq GHC.Type where
-  (==) = GHC.eqType
-
 type ClosedTyFam = GHC.CoAxiom GHC.Branched
 
 hasConstraintKind :: GHC.Type -> Bool

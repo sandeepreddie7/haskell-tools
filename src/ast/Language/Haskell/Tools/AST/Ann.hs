@@ -36,6 +36,7 @@ import Language.Haskell.Tools.AST.Representation.Literals as AST
 data RangeStage
 
 deriving instance Data RangeStage
+deriving instance Eq RangeStage
 
 -- | A stage in which the nodes are still marked with ranges, but these
 -- ranges are normalized. Optional and list elements also have ranges
@@ -43,13 +44,14 @@ deriving instance Data RangeStage
 data NormRangeStage
 
 deriving instance Data NormRangeStage
-
+deriving instance Eq NormRangeStage
 -- | A stage in which AST elements are marked with templates. These
 -- templates are hierarchical, and contain the places of the children
 -- elements of the node.
 data RngTemplateStage
 
 deriving instance Data RngTemplateStage
+deriving instance Eq RngTemplateStage
 
 -- | A stage where the annotation controls how the original source code can be
 -- retrieved from the AST. A source template is assigned to each node.
@@ -58,6 +60,7 @@ deriving instance Data RngTemplateStage
 data SrcTemplateStage
 
 deriving instance Data SrcTemplateStage
+deriving instance Eq SrcTemplateStage
 
 -- | With this domain, semantic information can be parameterized. In practice
 -- it is only used if the compilation cannot proceed past the type checking phase.
@@ -67,8 +70,10 @@ data Dom name
 data IdDom
 
 deriving instance (Data name, Typeable name) => Data (Dom name)
+deriving instance (Eq name, Typeable name) => Eq (Dom name)
 
 deriving instance Data IdDom
+deriving instance Eq IdDom
 
 type SemanticInfo (domain :: *) (node :: * -> * -> *) = SemanticInfo' domain (SemaInfoClassify node)
 
@@ -114,6 +119,7 @@ type instance SemanticInfo' IdDom SemaInfoDefaultCls = NoSemanticInfo
 -- The domain is not applied to the AST elements that are generated while refactoring.
 type Domain d = ( Typeable d
                 , Data d
+                , Eq d
                 , SemanticInfo' d SemaInfoDefaultCls ~ NoSemanticInfo
                 , Data (SemanticInfo' d SemaInfoNameCls)
                 , Data (SemanticInfo' d SemaInfoLitCls)
@@ -121,9 +127,16 @@ type Domain d = ( Typeable d
                 , Data (SemanticInfo' d SemaInfoImportCls)
                 , Data (SemanticInfo' d SemaInfoModuleCls)
                 , Data (SemanticInfo' d SemaInfoWildcardCls)
+                , Eq (SemanticInfo' d SemaInfoNameCls)
+                , Eq (SemanticInfo' d SemaInfoLitCls)
+                , Eq (SemanticInfo' d SemaInfoExprCls)
+                , Eq (SemanticInfo' d SemaInfoImportCls)
+                , Eq (SemanticInfo' d SemaInfoModuleCls)
+                , Eq (SemanticInfo' d SemaInfoWildcardCls)
                 )
 
 type DomainWith e d = ( Data (SemanticInfo' d (SemaInfoClassify e))
+                      , Eq (SemanticInfo' d (SemaInfoClassify e))
                       , Domain d
                       )
 
@@ -139,6 +152,10 @@ class ( Typeable stage
       , Data (SpanInfo stage)
       , Data (ListInfo stage)
       , Data (OptionalInfo stage)
+      , Eq stage
+      , Eq (SpanInfo stage)
+      , Eq (ListInfo stage)
+      , Eq (OptionalInfo stage)
       , HasRange (SpanInfo stage)
       , HasRange (ListInfo stage)
       , HasRange (OptionalInfo stage)
@@ -154,19 +171,19 @@ class ( Typeable stage
 
 instance SourceInfo RangeStage where
   data SpanInfo RangeStage = NodeSpan { _nodeSpan :: SrcSpan }
-    deriving (Data)
+    deriving (Data, Eq)
   data ListInfo RangeStage = ListPos  { _listBefore :: String
                                       , _listAfter :: String
                                       , _listDefaultSep :: String
                                       , _listIndented :: Maybe [Bool]
                                       , _listPos :: SrcLoc
                                       }
-    deriving (Data)
+    deriving (Data, Eq)
   data OptionalInfo RangeStage = OptionalPos { _optionalBefore :: String
                                              , _optionalAfter :: String
                                              , _optionalPos :: SrcLoc
                                              }
-    deriving (Data)
+    deriving (Data, Eq)
 
 instance Show (SpanInfo RangeStage) where
   show (NodeSpan sp) = shortShowSpan sp
@@ -179,19 +196,19 @@ instance Show (OptionalInfo RangeStage) where
 
 instance SourceInfo NormRangeStage where
   data SpanInfo NormRangeStage = NormNodeInfo { _normNodeSpan :: SrcSpan }
-    deriving (Data)
+    deriving (Data, Eq)
   data ListInfo NormRangeStage = NormListInfo { _normListBefore :: String
                                               , _normListAfter :: String
                                               , _normListDefaultSep :: String
                                               , _normListIndented :: Maybe [Bool]
                                               , _normListSpan :: SrcSpan
                                               }
-    deriving (Data)
+    deriving (Data, Eq)
   data OptionalInfo NormRangeStage = NormOptInfo { _normOptBefore :: String
                                                  , _normOptAfter :: String
                                                  , _normOptSpan :: SrcSpan
                                                  }
-    deriving (Data)
+    deriving (Data, Eq)
 
 instance Show (SpanInfo NormRangeStage) where
   show (NormNodeInfo sp) = shortShowSpan sp

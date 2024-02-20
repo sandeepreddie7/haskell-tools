@@ -17,7 +17,7 @@ instance SourceInfo RngTemplateStage where
   data SpanInfo RngTemplateStage = RangeTemplateNode { _rngTemplateNodeRange :: RealSrcSpan
                                                      , _rngTemplateNodeElems :: [RangeTemplateElem]
                                                      }
-    deriving Data
+    deriving (Data, Eq)
   data ListInfo RngTemplateStage = RangeTemplateList { _rngTemplateListRange :: RealSrcSpan
                                                      , _rngTmpListBefore :: String -- ^ Text that should be put before the first element if the list becomes populated
                                                      , _rngTmpListAfter :: String -- ^ Text that should be put after the last element if the list becomes populated
@@ -25,12 +25,12 @@ instance SourceInfo RngTemplateStage where
                                                      , _rngTmpIndented :: Maybe [Bool] -- ^ False for elements that should be not aligned
                                                      , _rngTmpSeparators :: [RealSrcSpan] -- ^ The actual separators that were found in the source code
                                                      }
-    deriving Data
+    deriving (Data, Eq)
   data OptionalInfo RngTemplateStage = RangeTemplateOpt { _rngTemplateOptRange :: RealSrcSpan
                                                         , _rngTmpOptBefore :: String -- ^ Text that should be put before the element if it appears
                                                         , _rngTmpOptAfter :: String -- ^ Text that should be put after the element if it appears
                                                         }
-    deriving Data
+    deriving (Data, Eq)
 
 
 rngTemplateNodeRange :: Simple Lens (SpanInfo RngTemplateStage) RealSrcSpan
@@ -69,7 +69,7 @@ rngTmpOptAfter = lens _rngTmpOptAfter (\v s -> s { _rngTmpOptAfter = v })
 -- | An element of a range template for a singleton AST node.
 data RangeTemplateElem = RangeElem RealSrcSpan -- ^ A range for the source code of the element
                        | RangeChildElem        -- ^ The place for a child element
-                       deriving Data
+                       deriving (Data, Eq)
 
 getRangeElemSpan :: RangeTemplateElem -> Maybe RealSrcSpan
 getRangeElemSpan (RangeElem sp) = Just sp

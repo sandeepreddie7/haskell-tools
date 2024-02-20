@@ -43,6 +43,10 @@ import GHC.Hs.Extension (IdP)
 import Data.Data as Data
 import Control.Reference
 import Control.Monad.IO.Class
+import Data.Eq.Deriving (deriveEq)
+
+instance Eq Type where
+  (==) = eqType
 
 type Scope = [[(Name, Maybe [UsageSpec], Maybe Name)]]
 
@@ -50,7 +54,7 @@ data UsageSpec = UsageSpec { usageQualified :: Bool
                            , usageQualifier :: String
                            , usageAs :: String
                            }
-  deriving Data
+  deriving (Data, Eq)
 
 -- | Semantic info type for any node not
 -- carrying additional semantic information
@@ -96,6 +100,7 @@ data NameInfo n = NameInfo { _nameScopedLocals :: Scope
                                    }
 
 deriving instance (Data n, Typeable n, Data (IdP n)) => Data (NameInfo n)
+deriving instance (Eq n, Eq (IdP n)) => Eq (NameInfo n)
 -- deriving instance Functor NameInfo
 -- deriving instance Foldable NameInfo
 -- deriving instance Traversable NameInfo
@@ -130,6 +135,7 @@ data PName n
           }
 
 deriving instance (Data n, Typeable n, Data (IdP n)) => Data (PName n)
+deriving instance (Eq n, Eq (IdP n)) => Eq (PName n)
 
 trfPNames :: (IdP n -> IdP n') -> PName n -> PName n'
 trfPNames f (PName name parent) = PName (f name) (fmap f parent)
@@ -151,11 +157,14 @@ trfModuleInfoM f (ModuleInfo mn df bm impl tm)
   = ModuleInfo mn df bm <$> mapM (trfPNamesM f) impl <*> return tm
 
 deriving instance (Data n, Typeable n, Data (IdP n)) => Data (ModuleInfo n)
+deriving instance (Eq n, Eq (IdP n)) => Eq (ModuleInfo n)
 
 instance Data DynFlags where
   gunfold _ _ _ = error "Cannot construct dyn flags"
   toConstr _ = dynFlagsCon
   dataTypeOf _ = dynFlagsType
+
+instance Eq DynFlags where
 
 dynFlagsType = mkDataType "DynFlags.DynFlags" [dynFlagsCon]
 dynFlagsCon = mkConstr dynFlagsType "DynFlags" [] Data.Prefix
@@ -183,6 +192,7 @@ trfImportInfoM f (ImportInfo mod avail imp trm)
   = ImportInfo mod <$> (mapM f avail) <*> (mapM (trfPNamesM f) imp) <*> return trm
 
 deriving instance (Data n, Typeable n, Data (IdP n)) => Data (ImportInfo n)
+deriving instance (Eq n, Eq (IdP n)) => Eq (ImportInfo n)
 
 deriving instance Data FamInst
 deriving instance Data FamFlavor
@@ -223,3 +233,10 @@ makeReferences ''ModuleInfo
 makeReferences ''ImportInfo
 makeReferences ''ImplicitFieldInfo
 makeReferences ''LiteralInfo
+
+$(deriveEq ''ScopeInfo)
+$(deriveEq ''PreLiteralInfo)
+$(deriveEq ''CNameInfo)
+$(deriveEq ''ImplicitFieldInfo)
+$(deriveEq ''LiteralInfo)
+$(deriveEq ''NoSemanticInfo)

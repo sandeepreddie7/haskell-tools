@@ -44,6 +44,7 @@ library
                      , Language.Haskell.Tools.AST.Instances.SourceInfoTraversal
                      , Language.Haskell.Tools.AST.TH.SemanticTraversal
                      , Language.Haskell.Tools.AST.TH.SourceInfoTraversal
+                     , Language.Haskell.Tools.AST.Instances.ToJSON
 
   build-depends:       base             
                      , ghc           
@@ -52,5 +53,7 @@ library
                      , mtl              
                      , template-haskell 
                      , classyplate      
-                     , pretty      
+                     , pretty    
+                     , aeson 
+                     , deriving-compat
   default-language:    Haskell2010
