@@ -59,7 +59,7 @@ import qualified Data.HashMap.Strict as HM
 import System.IO
 import Control.Monad
 import qualified Data.Aeson as A
-import Data.List.Extra (replace)
+import Data.List.Extra (replace, stripSuffix)
 import Shelly
 import Language.Haskell.Tools.Parser.RemoveUnusedFuns (getFunctionDepOfModule')
 import qualified Language.Haskell.Tools.Parser.GetFunctionBranching as GFT
@@ -115,57 +115,114 @@ traverseOverUValBind expr@(Ann _ (UValueBinding (FunctionBind' ex))) = do
     if not $ null funName then do
         Just (head funName, expr)
     else Nothing
-traverseOverUValBind expr = Nothing
+traverseOverUValBind expr@(Ann _ (UValueBinding (Ann _ (USimpleBind pat _ ex)))) = do
+    let funName = fromJust $ getPatternName' pat
+    if not $ null funName then do
+        Just (head funName, expr)
+    else Nothing
+traverseOverUValBind expr = HT.trace (show expr) $ Nothing
+
+traverseOverClassBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> [(String, Ann UDecl (Dom GhcPs) SrcTemplateStage)]
+traverseOverClassBind expr@(Ann _ (UClassDecl _ _ _ (AnnMaybeG _ (Just (Ann _ (UClassBody (AnnListG _ body))))))) =
+    mapMaybe (\x -> do
+                val <- getClassFun x
+                pure (val,expr)) $ body
+traverseOverClassBind expr = []
+
+getClassFun :: Ann UClassElement (Dom GhcPs) SrcTemplateStage -> Maybe (String)
+getClassFun expr@(Ann _ (UClsSig (Ann _ (UTypeSignature funName _)))) = Just (head $ map getFunctions' $ funName ^? biplateRef)
+getClassFun expr = Nothing
 
 getFunctionNameFromValBind :: Ann UMatch (Dom GhcPs) SrcTemplateStage -> Maybe String
 getFunctionNameFromValBind expr@(Ann _ (UMatch (Ann _ (UNormalLhs (Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart ex)))))) ex1)) _ _)) = Just ex
 getFunctionNameFromValBind _ = Nothing
 
-getAllFunctions moduleAST = mapMaybe (\x -> traverseOverUValBind x) (moduleAST ^? biplateRef)
+getAllFunctions moduleAST =
+    let classBinds = concat $ map (\x -> traverseOverClassBind x) (moduleAST ^? biplateRef)
+        funBinds = mapMaybe (\x -> traverseOverUValBind x) (moduleAST ^? biplateRef)
+    in funBinds ++ classBinds
 
+output = ["/home/chaitanya/Desktop/work/euler-api-gateway/src/Euler/API/Gateway/Gateway/PineLabs/Flows/Emi.hs", "/home/chaitanya/Desktop/work/euler-api-gateway/src/Euler/API/Gateway/Gateway/PineLabs/Flows.hs","/home/chaitanya/Desktop/work/euler-api-gateway/src/Euler/API/Gateway/Gateway/Common.hs","/home/chaitanya/Desktop/work/euler-api-gateway/src/Euler/API/Gateway/App/Routes.hs","/home/chaitanya/Desktop/work/euler-api-gateway/src/Euler/API/Gateway/App/Server.hs"]
 
-getParentFun :: String -> IO ()
+getParentFun :: String -> IO [String]
 getParentFun modName = do
-    let allFiles =  filter (/="Main.hs") $ RS.getAllSubFils "/home/chaitanya/Desktop/work/euler-api-gateway/src/Euler/API/Gateway/Gateway/PineLabs/" []
-    print allFiles
-    -- x <- mapM (\fileName -> parseAllFiles "Euler.API.Gateway.Gateway.PineLabs.Flows.Emi" (replace "/" "." $ fromMaybe "" $ stripPrefix ("/home/chaitanya/Desktop/work/euler-api-gateway/src/")  fileName)) allFiles
-    x <- mapM (\fileName -> parseAllFiles "Euler.API.Gateway.Gateway.PineLabs.Flows.Emi" fileName) allFiles
-    print x
-    pure ()
+    let allFiles =  filter (/="Main.hs") $ RS.getAllSubFils "/home/chaitanya/Desktop/work/euler-api-gateway/src" []
+    let importsHashMap = (HM.empty :: HM.HashMap String [String])
+    getImpsHm <- mapM (\x -> do
+                         imps <- parseImportsFromFile x
+                         pure (x,imps)) allFiles
+    val <- getAllDepFiles allFiles (HM.fromList getImpsHm) "Euler.API.Gateway.Gateway.PineLabs.Flows.Emi"
+    pure val
+  where
+    -- getAllDepFiles [] _ _ = pure []
+    getAllDepFiles allFiles importsHashMap modCheck = do
+        x <- filterM (\fileName -> parseAllFiles modCheck fileName importsHashMap) allFiles
+        y <- mapM (\t -> getAllDepFiles allFiles importsHashMap (fromMaybe "" $ stripSuffix ".hs" $ replace "/" "." $ fromMaybe "" $ stripPrefix "/home/chaitanya/Desktop/work/euler-api-gateway/src/" t)) x
+        pure $ nub $ x ++ (concat y)
+
+        -- pure ()
     -- moduleAST <- mapM (\x -> moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src" modName
     -- let importHM = foldl' (\acc x -> parseImportsAndGetModule x acc) HM.empty $ (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
 
-parseAllFiles :: String -> String -> IO [String]
-parseAllFiles modCheck modName = do
+getParentFunctions :: IO [String]
+getParentFunctions = do
+    let fun = "normalizeBankCode"
+    allFunList <- foldM (\acc t -> do
+        let name = fromMaybe "" $ stripSuffix ".hs" $ replace "/" "." $ fromMaybe "" $ stripPrefix "/home/chaitanya/Desktop/work/euler-api-gateway/src/" t
+        x <- undefined -- getModFunctionList name
+        pure x) [] output
+    -- filteredFuns <-
+    --          (foldM (\acc (funName,y) -> do
+    --                 if funName == "transformEmisForBank" then print (snd <$> y) else pure ()
+    --                 pure $ if fun `elem` (snd <$> y) then acc ++ [funName] else acc)) [] x
+    pure []
+    where
+        getDepFuns allFunList funName = undefined
+            -- filteredFuns <-
+            --  (foldM (\acc (funName,y) -> do
+            --         if funName == "transformEmisForBank" then print (snd <$> y) else pure ()
+            --         pure $ if fun `elem` (snd <$> y) then acc ++ [funName] else acc)) [] x
+            -- pure filteredFuns
+
+parseAllFiles :: String -> String -> _ -> IO Bool
+parseAllFiles modCheck modName importsHashMap = do
+    (importsList) <-
+      case HM.lookup modName importsHashMap of
+        Just val -> do
+            print ("Got file " ++ modName)
+            pure (val)
+        Nothing -> do
+            print ("Parsing file " ++ modName ++ modCheck)
+            content <- readFile modName
+            impList <- mapM (\x -> if "import " `Data.List.isPrefixOf` x then getImportModuleName x else pure "") (Data.List.lines content)
+            pure (impList)
+    pure $ (if modCheck `elem` importsList then True else False)
+
+parseImportsFromFile modName = do
     content <- readFile modName
-    -- print content
-    importsList <- mapM (\x -> if "import " `Data.List.isPrefixOf` x then getImportModuleName x else pure "") (Data.List.lines content)
-    let importHM = filter (\x -> (x /= "")) $ filter (\x -> (x == modCheck)) $ importsList
-    print importHM
-    pure importHM
+    impList <- mapM (\x -> if "import " `Data.List.isPrefixOf` x then getImportModuleName x else pure "") (Data.List.lines content)
+    pure (impList)
 
 parseImportsAndGetModule :: _ -> String
 parseImportsAndGetModule x@(GHC.ImportDecl _ _ modName pkgQual isBoot _ isQual _ asMod explicitImports) = (GHC.moduleNameString $ unLoc modName)
 
-getModFunctionList :: IO ()
-getModFunctionList = do
-    let modName = "Euler.API.Gateway.Gateway.Common"
-    moduleAST <- moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src" modName
+getModFunctionList :: _ -> String -> IO [(String, [(String, String)])]
+getModFunctionList moduleAST modName = do
     let allFuns = getAllFunctions moduleAST
     !originalList <- mapM (\(k,val) -> do
                     funDeps <- getAllFunctionDeps val k
                     pure $ (k, funDeps)) allFuns
 
-    let updateMods = map (\(k,v) -> (k,(mapWithModName v (HM.fromList allFuns) moduleAST modName))) (originalList)
+    let updateMods = map (\(k,v) -> (k,(concat $ mapWithModName v (HM.fromList allFuns) moduleAST modName))) (originalList)
     -- print importHMQ
-    print updateMods
+    pure updateMods
     where
         mapWithModName funList allFuns moduleAST modName = do
             let importHM = foldl' (\acc x -> GFT.parseImportsAndGetModule x acc) HM.empty $ (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
             let importHMQ = foldl' (\acc x -> GFT.parseImportsAndGetQualModule x acc) HM.empty $ (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
-            map (\(fun@(x,y)) -> case (snd <$> HM.lookup (fromMaybe "" x) importHM) <|> (HM.lookup (fromMaybe "" x) importHMQ) of
+            map (\(fun@(x,y)) -> case (snd <$> HM.lookup (y) importHM) <|> (HM.lookup (fromMaybe "" x) importHMQ) of
                                     Just imp -> (imp,y)
-                                    Nothing -> (modName,y)) <$> funList
+                                    Nothing -> ("",y)) <$> funList
 
 
 getAllFunctionDeps :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> String -> IO [[(Maybe String, String)]]
