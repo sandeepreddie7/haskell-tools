@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, DeriveGeneric, DeriveAnyClass, DeriveDataTypeable #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
 module Language.Haskell.Tools.Parser.FlowChange where
@@ -71,6 +71,8 @@ import Control.Exception
 
 import Language.Haskell.Tools.AST.Representation.Binds (ULocalBind)
 import qualified Language.Haskell.Tools.Parser.RemoveUnusedFuns as RS
+import GHC.Generics (Generic(..))
+import Data.Aeson
 
 data FunctionModified =
   FunctionModified  {
@@ -79,7 +81,13 @@ data FunctionModified =
     , added :: [String]
     , modName :: String
     }
-  deriving (Show)
+  deriving (Show,Generic)
+
+instance FromJSON FunctionModified where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON FunctionModified where
+  toJSON = genericToJSON defaultOptions
 
 -- listDir :: IO String
 -- listDir commit1 commit2 = do
