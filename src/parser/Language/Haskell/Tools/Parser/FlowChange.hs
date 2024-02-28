@@ -120,7 +120,7 @@ traverseOverUValBind expr@(Ann _ (UValueBinding (Ann _ (USimpleBind pat _ ex))))
     if not $ null funName then do
         Just (head funName, expr)
     else Nothing
-traverseOverUValBind expr = HT.trace (show expr) $ Nothing
+traverseOverUValBind expr = Nothing
 
 traverseOverClassBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> [(String, Ann UDecl (Dom GhcPs) SrcTemplateStage)]
 traverseOverClassBind expr@(Ann _ (UClassDecl _ _ _ (AnnMaybeG _ (Just (Ann _ (UClassBody (AnnListG _ body))))))) =
