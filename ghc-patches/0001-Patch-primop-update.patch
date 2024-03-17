@@ -1,0 +1,309 @@
+From 010fb5d1606f3c351c43f5d15d81cf6e843e49b0 Mon Sep 17 00:00:00 2001
+From: Adithya Kumar <adithya@composewell.com>
+Date: Thu, 2 Nov 2023 11:04:01 +0530
+Subject: [PATCH] Patch primop update
+
+---
+ compiler/GHC/StgToCmm/Prim.hs   |  1 +
+ compiler/prelude/primops.txt.pp |  6 +++
+ includes/rts/storage/TSO.h      |  7 ++++
+ includes/stg/MiscClosures.h     |  1 +
+ rts/PrimOps.cmm                 | 31 +++++++++++++++
+ rts/RtsSymbols.c                |  1 +
+ rts/Schedule.c                  | 70 +++++++++++++++++++++++++++++++++
+ rts/Schedule.h                  |  8 ++++
+ rts/Threads.c                   |  5 +++
+ rts/Trace.c                     |  6 +++
+ utils/deriveConstants/Main.hs   |  6 +++
+ 11 files changed, 142 insertions(+)
+
+diff --git a/compiler/GHC/StgToCmm/Prim.hs b/compiler/GHC/StgToCmm/Prim.hs
+index 9d780b451d..8c57320ed9 100644
+--- a/compiler/GHC/StgToCmm/Prim.hs
++++ b/compiler/GHC/StgToCmm/Prim.hs
+@@ -1496,6 +1496,7 @@ emitPrimOp dflags = \case
+   IsCurrentThreadBoundOp -> alwaysExternal
+   NoDuplicateOp -> alwaysExternal
+   ThreadStatusOp -> alwaysExternal
++  ThreadCPUTimeOp -> alwaysExternal
+   MkWeakOp -> alwaysExternal
+   MkWeakNoFinalizerOp -> alwaysExternal
+   AddCFinalizerToWeakOp -> alwaysExternal
+diff --git a/compiler/prelude/primops.txt.pp b/compiler/prelude/primops.txt.pp
+index f47880b58d..a105df6256 100644
+--- a/compiler/prelude/primops.txt.pp
++++ b/compiler/prelude/primops.txt.pp
+@@ -2919,6 +2919,12 @@ primop  ThreadStatusOp "threadStatus#" GenPrimOp
+    out_of_line = True
+    has_side_effects = True
+ 
++primop  ThreadCPUTimeOp "threadCPUTime#" GenPrimOp
++   State# RealWorld -> (# State# RealWorld, INT64, INT64, INT32, INT32 #)
++   with
++   out_of_line = True
++   has_side_effects = True
++
+ ------------------------------------------------------------------------
+ section "Weak pointers"
+ ------------------------------------------------------------------------
+diff --git a/includes/rts/storage/TSO.h b/includes/rts/storage/TSO.h
+index d706282796..c969a87bef 100644
+--- a/includes/rts/storage/TSO.h
++++ b/includes/rts/storage/TSO.h
+@@ -182,6 +182,13 @@ typedef struct StgTSO_ {
+ #if defined(mingw32_HOST_OS)
+     StgWord32 saved_winerror;
+ #endif
++    // Can this go in the thread cost centre stack or a similar data structure
++    // for perf stats? We can enable the use of this using an RTS option.
++    // See compiler/profiling/CostCentre.hs
++    StgInt64 cur_sec;
++    StgInt64 cur_nsec;
++    StgInt32 count_thread_sched_out;
++    StgInt32 cur_allocated;
+ 
+ } *StgTSOPtr; // StgTSO defined in rts/Types.h
+ 
+diff --git a/includes/stg/MiscClosures.h b/includes/stg/MiscClosures.h
+index 5b2364407f..5b67c8d4a1 100644
+--- a/includes/stg/MiscClosures.h
++++ b/includes/stg/MiscClosures.h
+@@ -448,6 +448,7 @@ RTS_FUN_DECL(stg_myThreadIdzh);
+ RTS_FUN_DECL(stg_labelThreadzh);
+ RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
+ RTS_FUN_DECL(stg_threadStatuszh);
++RTS_FUN_DECL(stg_threadCPUTimezh);
+ 
+ RTS_FUN_DECL(stg_mkWeakzh);
+ RTS_FUN_DECL(stg_mkWeakNoFinalizzerzh);
+diff --git a/rts/PrimOps.cmm b/rts/PrimOps.cmm
+index f93f7b19cf..50e085e04f 100644
+--- a/rts/PrimOps.cmm
++++ b/rts/PrimOps.cmm
+@@ -1110,6 +1110,37 @@ stg_threadStatuszh ( gcptr tso )
+     return (ret,cap,locked);
+ }
+ 
++stg_threadCPUTimezh (/* no args */)
++{
++    // I64 sec, nsec;
++    I64 sec_res, nsec_res;
++    I32 count_thread_sched_out, cur_allocated_res;
++    W_ tmp, sec_ptr, nsec_ptr, cur_allocated_ptr;
++
++    // sec   = StgTSO_cur_sec(CurrentTSO);
++    // nsec  = StgTSO_cur_nsec(CurrentTSO);
++
++    // sec = b64[CurrentTSO+120];
++    // nsec = b64[CurrentTSO+128];
++
++    count_thread_sched_out = I32[CurrentTSO+136];
++
++    //ccall traceThreadCPUTime(sec, nsec, SIZEOF_StgHeader+OFFSET_StgTSO_cur_nsec, SIZEOF_StgHeader);
++
++    STK_CHK_GEN_N (20);
++    reserve 20 = tmp {
++        sec_ptr = tmp;
++        nsec_ptr = tmp + 8;
++        cur_allocated_ptr = tmp + 16;
++        ccall updateThreadCPUTimePostPrim(MyCapability(), CurrentTSO "ptr", sec_ptr "ptr", nsec_ptr "ptr", cur_allocated_ptr "ptr");
++        sec_res = I64[sec_ptr];
++        nsec_res = I64[nsec_ptr];
++        cur_allocated_res = I32[cur_allocated_ptr];
++    }
++
++    return (sec_res, nsec_res, cur_allocated_res, count_thread_sched_out);
++}
++
+ /* -----------------------------------------------------------------------------
+  * TVar primitives
+  * -------------------------------------------------------------------------- */
+diff --git a/rts/RtsSymbols.c b/rts/RtsSymbols.c
+index d5b8cc5fec..c875e88fab 100644
+--- a/rts/RtsSymbols.c
++++ b/rts/RtsSymbols.c
+@@ -927,6 +927,7 @@
+       SymI_HasProto(stg_takeMVarzh)                                     \
+       SymI_HasProto(stg_readMVarzh)                                     \
+       SymI_HasProto(stg_threadStatuszh)                                 \
++      SymI_HasProto(stg_threadCPUTimezh)                                \
+       SymI_HasProto(stg_tryPutMVarzh)                                   \
+       SymI_HasProto(stg_tryTakeMVarzh)                                  \
+       SymI_HasProto(stg_tryReadMVarzh)                                  \
+diff --git a/rts/Schedule.c b/rts/Schedule.c
+index 8b43335a0e..267abeb228 100644
+--- a/rts/Schedule.c
++++ b/rts/Schedule.c
+@@ -217,6 +217,72 @@ traceEventAllocated (Capability *cap, StgTSO *t, EventTypeNum event)
+     traceEventThreadCounter(cap, t, event, allocated * sizeof(W_));
+ }
+ 
++static void updateThreadCPUTimePre (Capability *cap, StgTSO *t)
++{
++    struct timespec ts;
++    int retval;
++    retval = clock_gettime (CLOCK_THREAD_CPUTIME_ID, &ts);
++    if (retval != 0) {
++        fprintf (stderr, "clock_gettime before failed");
++    } else {
++        if (t->cur_sec < 0 || t->cur_nsec < 0) {
++            fprintf (stderr, "ON ENTRY ERROR: t->cur_sec = %ld t->cur_nsec = %ld\n", t->cur_sec, t->cur_nsec);
++        }
++        t->cur_sec -= ts.tv_sec;
++        t->cur_nsec -= ts.tv_nsec;
++        // fprintf (stderr, "BEFORE START: tid = %d, t->cur_sec = %ld t->cur_nsec = %ld\n", t->id, t->cur_sec, t->cur_nsec);
++        // nsec offset is 128
++        //fprintf (stderr, "tso nsec offset: %ld", (char *)(&t->cur_nsec) - (char *)t);
++        //exit (1);
++        // nsec sizeof = 8
++        //fprintf (stderr, "tso nsec size: %d", sizeof(t->cur_nsec));
++    };
++
++    t->cur_allocated -= getCurrentAllocated (cap);
++    // fprintf (stderr, "PRE: %d\n", t->cur_allocated);
++}
++
++// This is also used in the PrimOps as a foreign call
++void updateThreadCPUTimePostPrim
++    (Capability *cap,
++     StgTSO *t,
++     StgInt64 *cur_sec_res,
++     StgInt64 *cur_nsec_res,
++     StgInt32 *cur_allocated_res)
++{
++    *cur_allocated_res = t->cur_allocated + getCurrentAllocated (cap);
++    // fprintf (stderr, "POST: %d\n", t->cur_allocated);
++
++    struct timespec ts;
++    int retval;
++    retval = clock_gettime (CLOCK_THREAD_CPUTIME_ID, &ts);
++    if (retval != 0) {
++        fprintf (stderr, "clock_gettime after failed");
++    } else {
++        //fprintf (stderr, "sec = %ld nsec = %ld\n", ts.tv_sec, ts.tv_nsec);
++        *cur_sec_res = t->cur_sec + ts.tv_sec;
++        *cur_nsec_res = t->cur_nsec + ts.tv_nsec;
++        if (*cur_nsec_res < 0) {
++            *cur_nsec_res += TEN_POWER9;
++            *cur_sec_res -= 1;
++        } else if (*cur_nsec_res >= TEN_POWER9) {
++            *cur_nsec_res -= TEN_POWER9;
++            *cur_sec_res += 1;
++        }
++        // fprintf (stderr, "AFTER DONE: tid = %d, t->cur_sec = %ld t->cur_nsec = %ld\n", t->id, t->cur_sec, t->cur_nsec);
++        if (*cur_sec_res < 0 || *cur_nsec_res < 0) {
++            fprintf (stderr, "ON EXIT ERROR PRIM: t->cur_sec = %ld t->cur_nsec = %ld\n", *cur_sec_res, *cur_nsec_res);
++        }
++        //fprintf (stderr, "acc sec = %ld acc nsec = %ld\n", t->cur_sec, t->cur_nsec);
++    }
++}
++
++static void updateThreadCPUTimePost (Capability *cap, StgTSO *t)
++{
++    updateThreadCPUTimePostPrim(cap, t, &t->cur_sec, &t->cur_nsec, &t->cur_allocated);
++    t->count_thread_sched_out += 1;
++}
++
+ static void traceEventCounterStart (Capability *cap, Task* task, StgTSO *t)
+ {
+ #ifdef LINUX_PERF_EVENTS
+@@ -567,9 +633,11 @@ run_thread:
+         StgRegTable *r;
+ 
+         traceEventCounterStart (cap, task, t);
++        updateThreadCPUTimePre (cap, t);
+         r = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
+         t = cap->r.rCurrentTSO;
+         traceEventCounterStop (cap, task, t);
++        updateThreadCPUTimePost (cap, t);
+         cap = regTableToCapability(r);
+         ret = r->rRet;
+         break;
+@@ -2554,6 +2622,7 @@ suspendThread (StgRegTable *reg, bool interruptible)
+ 
+   //traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL, 0);
+   traceEventCounterStop (cap, task, tso);
++  updateThreadCPUTimePost (cap, tso);
+   // This is a separate call because we release the capability and the task is
+   // used for the foreign call. At the end of the call the thread is resumed
+   // again. The OS thread might block. Since we do not have the cap, the
+@@ -2675,6 +2744,7 @@ resumeThread (void *task_)
+     postForeignEvent(cap, task, EVENT_USER_MSG, "END:foreign");
+ #endif
+     traceEventCounterStart (cap, task, tso);
++    updateThreadCPUTimePre (cap, tso);
+ 
+     return &cap->r;
+ }
+diff --git a/rts/Schedule.h b/rts/Schedule.h
+index abecd84db8..0894d14ade 100644
+--- a/rts/Schedule.h
++++ b/rts/Schedule.h
+@@ -24,6 +24,14 @@ void exitScheduler (bool wait_foreign);
+ void freeScheduler (void);
+ void markScheduler (evac_fn evac, void *user);
+ 
++// Primitive operation used to update the threadCPUTime prim-op
++void updateThreadCPUTimePostPrim
++    (Capability *cap,
++     StgTSO *t,
++     StgInt64 *cur_sec_res,
++     StgInt64 *cur_nsec_res,
++     StgInt32 *cur_allocated_res);
++
+ // Place a new thread on the run queue of the current Capability
+ void scheduleThread (Capability *cap, StgTSO *tso);
+ 
+diff --git a/rts/Threads.c b/rts/Threads.c
+index fc9a895ed8..0d3cd8e425 100644
+--- a/rts/Threads.c
++++ b/rts/Threads.c
+@@ -117,6 +117,11 @@ createThread(Capability *cap, W_ size)
+     tso->prof.cccs = CCS_MAIN;
+ #endif
+ 
++    tso->cur_sec = 0;
++    tso->cur_nsec = 0;
++    tso->count_thread_sched_out = 0;
++    tso->cur_allocated = 0;
++
+     // put a stop frame on the stack
+     stack->sp -= sizeofW(StgStopFrame);
+     SET_HDR((StgClosure*)stack->sp,
+diff --git a/rts/Trace.c b/rts/Trace.c
+index 4f9040364e..0a478e2d7f 100644
+--- a/rts/Trace.c
++++ b/rts/Trace.c
+@@ -12,6 +12,12 @@
+ // internal headers
+ #include "Trace.h"
+ 
++/*
++void traceThreadCPUTime (int64_t sec, int64_t nsec, int off, int hdr) {
++  fprintf (stderr, "traceThreadCPUTime: sec = %ld nsec = %ld off = %d hdr = %d\n", sec, nsec, off, hdr);
++}
++*/
++
+ #if defined(TRACING)
+ 
+ #include "GetTime.h"
+diff --git a/utils/deriveConstants/Main.hs b/utils/deriveConstants/Main.hs
+index f6f590715b..3b98406e0a 100644
+--- a/utils/deriveConstants/Main.hs
++++ b/utils/deriveConstants/Main.hs
+@@ -455,6 +455,12 @@ wanteds os = concat
+           ,closureField_ Both "StgTSO_cccs" "StgTSO" "prof.cccs"
+           ,closureField  Both "StgTSO"      "stackobj"
+ 
++          -- XXX These fields might not be required for our use case
++          ,closureField  C "StgTSO"      "cur_sec"
++          ,closureField  C "StgTSO"      "cur_nsec"
++          ,closureField  C "StgTSO"      "count_thread_sched_out"
++          ,closureField  C "StgTSO"      "cur_allocated"
++
+           ,closureField       Both "StgStack" "sp"
+           ,closureFieldOffset Both "StgStack" "stack"
+           ,closureField       C    "StgStack" "stack_size"
+-- 
+2.17.1
+

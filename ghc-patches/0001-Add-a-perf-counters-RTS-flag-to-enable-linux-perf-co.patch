@@ -1,0 +1,129 @@
+From 9a3cb3f69acb208d741baab8d802d8e13322916b Mon Sep 17 00:00:00 2001
+From: Adithya Kumar <adithya@composewell.com>
+Date: Fri, 10 Nov 2023 00:44:12 +0530
+Subject: [PATCH] Add a perf-counters RTS flag to enable linux perf counters
+
+---
+ includes/rts/Flags.h             |  1 +
+ libraries/base/GHC/RTS/Flags.hsc |  3 +++
+ rts/RtsFlags.c                   |  6 ++++++
+ rts/Schedule.c                   |  6 ++++--
+ rts/Task.c                       | 10 ++++++++--
+ 5 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/includes/rts/Flags.h b/includes/rts/Flags.h
+index 37f1253501..01935cd1a3 100644
+--- a/includes/rts/Flags.h
++++ b/includes/rts/Flags.h
+@@ -223,6 +223,7 @@ typedef struct _MISC_FLAGS {
+                                           tasks in the future, we'd respect it
+                                           there as well. */
+     bool internalCounters;       /* See Note [Internal Counter Stats] */
++    bool perfCounters;           /* Enable linux perf counters */
+     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
+     StgWord linkerMemBase;       /* address to ask the OS for memory
+                                   * for the linker, NULL ==> off */
+diff --git a/libraries/base/GHC/RTS/Flags.hsc b/libraries/base/GHC/RTS/Flags.hsc
+index abff8aa1f9..6a81f019e7 100644
+--- a/libraries/base/GHC/RTS/Flags.hsc
++++ b/libraries/base/GHC/RTS/Flags.hsc
+@@ -140,6 +140,7 @@ data MiscFlags = MiscFlags
+     , machineReadable       :: Bool
+     , disableDelayedOsMemoryReturn :: Bool
+     , internalCounters      :: Bool
++    , perfCounters          :: Bool
+     , linkerAlwaysPic       :: Bool
+     , linkerMemBase         :: Word
+       -- ^ address to ask the OS for memory for the linker, 0 ==> off
+@@ -451,6 +452,8 @@ getMiscFlags = do
+                   (#{peek MISC_FLAGS, disableDelayedOsMemoryReturn} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek MISC_FLAGS, internalCounters} ptr :: IO CBool))
++            <*> (toBool <$>
++                  (#{peek MISC_FLAGS, perfCounters} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek MISC_FLAGS, linkerAlwaysPic} ptr :: IO CBool))
+             <*> #{peek MISC_FLAGS, linkerMemBase} ptr
+diff --git a/rts/RtsFlags.c b/rts/RtsFlags.c
+index 4361de8641..e360618aa2 100644
+--- a/rts/RtsFlags.c
++++ b/rts/RtsFlags.c
+@@ -246,6 +246,7 @@ void initRtsFlagsDefaults(void)
+     RtsFlags.MiscFlags.machineReadable         = false;
+     RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = false;
+     RtsFlags.MiscFlags.internalCounters        = false;
++    RtsFlags.MiscFlags.perfCounters            = false;
+     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
+     RtsFlags.MiscFlags.linkerMemBase           = 0;
+ 
+@@ -933,6 +934,11 @@ error = true;
+                       OPTION_SAFE;
+                       RtsFlags.MiscFlags.internalCounters = true;
+                   }
++                  else if (strequal("perf-counters",
++                                    &rts_argv[arg][2])) {
++                      OPTION_SAFE;
++                      RtsFlags.MiscFlags.perfCounters = true;
++                  }
+                   else if (strequal("info",
+                                &rts_argv[arg][2])) {
+                       OPTION_SAFE;
+diff --git a/rts/Schedule.c b/rts/Schedule.c
+index 267abeb228..a87408d933 100644
+--- a/rts/Schedule.c
++++ b/rts/Schedule.c
+@@ -289,9 +289,10 @@ static void traceEventCounterStart (Capability *cap, Task* task, StgTSO *t)
+     StgWord64 counter;
+     bool eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG &&
+                     rtsConfig.eventlog_writer != NULL;
++    bool perfCountersEnabled = RtsFlags.MiscFlags.perfCounters;
+     struct counter_desc *ctrs = task->task_counters;
+ 
+-    if (eventlog_enabled)
++    if (eventlog_enabled && perfCountersEnabled)
+     {
+         int i;
+         traceEventAllocated(cap, t, EVENT_PRE_THREAD_ALLOCATED);
+@@ -329,9 +330,10 @@ static void traceEventCounterStop (Capability *cap, Task* task, StgTSO *t)
+     StgWord64 counter;
+     bool eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG &&
+                     rtsConfig.eventlog_writer != NULL;
++    bool perfCountersEnabled = RtsFlags.MiscFlags.perfCounters;
+     struct counter_desc *ctrs = task->task_counters;
+ 
+-    if (eventlog_enabled)
++    if (eventlog_enabled && perfCountersEnabled)
+     {
+         int i;
+         perf_stop_all_counters(task);
+diff --git a/rts/Task.c b/rts/Task.c
+index 1445d9d27b..635ea16804 100644
+--- a/rts/Task.c
++++ b/rts/Task.c
+@@ -518,7 +518,10 @@ newBoundTask (void)
+     task->stopped = false;
+ 
+ #ifdef LINUX_PERF_EVENTS
+-    perf_init_counters(task);
++    bool perfCountersEnabled = RtsFlags.MiscFlags.perfCounters;
++    if (perfCountersEnabled) {
++        perf_init_counters(task);
++    }
+ #endif
+ 
+     newInCall(task);
+@@ -644,7 +647,10 @@ workerStart(Task *task)
+     }
+ 
+ #ifdef LINUX_PERF_EVENTS
+-    perf_init_counters(task);
++    bool perfCountersEnabled = RtsFlags.MiscFlags.perfCounters;
++    if (perfCountersEnabled) {
++        perf_init_counters(task);
++    }
+ #endif
+ 
+     // set the thread-local pointer to the Task:
+-- 
+2.17.1
+

@@ -20,6 +20,34 @@
     flake-parts,
     ...
   }:
+  let
+   # Overriding GHC to use perf counters provided by linux perf tools
+   ghc-overlay = self: super: {
+     haskell = super.haskell // {
+       compiler = super.haskell.compiler // {
+         ghc8107-perf-events = (super.haskell.compiler.ghc8107.overrideAttrs (drv: {
+           src = ./ghc-8.10.7-sdist.tar.xz;
+           patches = drv.patches ++ [ ./ghc-patches/0001-Patch-primop-update.patch ./ghc-patches/0001-Add-a-perf-counters-RTS-flag-to-enable-linux-perf-co.patch ./ghc-patches/0001-Disable-LINUX_PERF_EVENTS-and-improve-the-compile-sp.patch ];
+           preConfigure = ''
+             echo ${drv.version} >VERSION
+             patchShebangs boot
+             ./boot
+           '' + drv.preConfigure or "";
+         })).override {
+           bootPkgs = super.haskell.packages.ghc865Binary // {
+             happy = super.haskell.packages.ghc865Binary.happy_1_19_12;
+           };
+         };
+       };
+       packages = super.haskell.packages // {
+         ghc8107-perf-events = super.haskell.packages.ghc8107.override {
+           buildHaskellPackages = self.buildPackages.haskell.packages.ghc8107-perf-events;
+           ghc = self.buildPackages.haskell.compiler.ghc8107-perf-events;
+         };
+       };
+     };
+   };
+   in
     flake-parts.lib.mkFlake {inherit inputs;} {
       systems = nixpkgs.lib.systems.flakeExposed;
       imports = [inputs.haskell-flake.flakeModule];
@@ -27,12 +55,19 @@
       perSystem = {
         self',
         pkgs,
+        system,
         lib,
         config,
         ...
       }: {
+        _module.args.pkgs = import inputs.nixpkgs {
+          inherit system;
+          overlays = [
+            ghc-overlay
+          ];
+        };
         haskellProjects.default = {
-          basePackages = pkgs.haskell.packages.ghc8107;
+          basePackages = pkgs.haskell.packages.ghc8107-perf-events;
           packages = {
             references.source = inputs.references;
             classyplate.source = inputs.classyplate;

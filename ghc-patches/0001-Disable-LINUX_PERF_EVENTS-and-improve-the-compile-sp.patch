@@ -1,0 +1,91 @@
+From c85197515a0e45b713a30d966ec8758226b129a2 Mon Sep 17 00:00:00 2001
+From: Adithya Kumar <adithya@composewell.com>
+Date: Tue, 21 Nov 2023 11:04:48 +0530
+Subject: [PATCH] Disable LINUX_PERF_EVENTS and improve the compile split
+
+---
+ rts/Schedule.c          | 10 +++++++---
+ rts/Task.c              |  2 +-
+ rts/eventlog/EventLog.c |  4 ++++
+ 3 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/rts/Schedule.c b/rts/Schedule.c
+index a87408d933..c213993719 100644
+--- a/rts/Schedule.c
++++ b/rts/Schedule.c
+@@ -67,7 +67,7 @@
+ #include "eventlog/EventLog.h"
+ #endif
+ 
+-#define LINUX_PERF_EVENTS
++#undef LINUX_PERF_EVENTS
+ #ifdef LINUX_PERF_EVENTS
+ #include <unistd.h>
+ #include <sys/ioctl.h>
+@@ -2622,7 +2622,9 @@ suspendThread (StgRegTable *reg, bool interruptible)
+   task = cap->running_task;
+   tso = cap->r.rCurrentTSO;
+ 
+-  //traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL, 0);
++#ifndef LINUX_PERF_EVENTS
++  traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL, 0);
++#endif
+   traceEventCounterStop (cap, task, tso);
+   updateThreadCPUTimePost (cap, tso);
+   // This is a separate call because we release the capability and the task is
+@@ -2715,7 +2717,9 @@ resumeThread (void *task_)
+     }
+     tso->_link = END_TSO_QUEUE;
+ 
+-    // traceEventRunThread(cap, tso);
++#ifndef LINUX_PERF_EVENTS
++    traceEventRunThread(cap, tso);
++#endif
+ 
+     /* Reset blocking status */
+     tso->why_blocked  = NotBlocked;
+diff --git a/rts/Task.c b/rts/Task.c
+index 635ea16804..f0fc3a653e 100644
+--- a/rts/Task.c
++++ b/rts/Task.c
+@@ -25,7 +25,7 @@
+ #include <signal.h>
+ #endif
+ 
+-#define LINUX_PERF_EVENTS
++#undef LINUX_PERF_EVENTS
+ #ifdef LINUX_PERF_EVENTS
+ #include <unistd.h>
+ #include <sys/ioctl.h>
+diff --git a/rts/eventlog/EventLog.c b/rts/eventlog/EventLog.c
+index 0cfee3651b..03abdc8704 100644
+--- a/rts/eventlog/EventLog.c
++++ b/rts/eventlog/EventLog.c
+@@ -31,6 +31,8 @@
+ #include <sys/resource.h>
+ #include <sys/times.h>
+ 
++#undef LINUX_PERF_EVENTS
++
+ bool eventlog_enabled;
+ 
+ static const EventLogWriter *event_log_writer = NULL;
+@@ -1265,6 +1267,7 @@ static void postCounterEvent(StgWord32 tid, EventsBuf *eb, StgWord64 counter,
+ static void postUserEventInternal(int isHaskell,
+     Capability *cap, Task *task, EventTypeNum type, char *msg)
+ {
++#ifdef LINUX_PERF_EVENTS
+     // Note: do not use the cap->running_task, it is not correct in foreign
+     // call case..
+     const size_t size = strlen(msg);
+@@ -1339,6 +1342,7 @@ static void postUserEventInternal(int isHaskell,
+               EVENT_PRE_PROCESS_CPU_TIME, type, required, msg);
+     }
+     perf_start_all_counters(task);
++#endif
+ }
+ 
+ void postUserEvent(Capability *cap, EventTypeNum type, char *msg)
+-- 
+2.17.1
+
