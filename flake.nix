@@ -5,7 +5,6 @@
     direct-sqlite.flake = false;
     direct-sqlite.url = "github:IreneKnapp/direct-sqlite";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    fswatch.flake = true;
     fswatch.url = "github:eswar2001/watch/41839963961c6890c62a74d24056f4769fdf137b";
     haskell-flake.url = "github:srid/haskell-flake";
     inspection-testing.flake = false;
@@ -67,11 +66,13 @@
             ];
           };
           haskellProjects.default = {
+            imports = [
+              inputs.fswatch.haskellFlakeProjectModules.output
+            ];
             basePackages = pkgs.haskell.packages.ghc8107-perf-events;
             packages = {
               references.source = inputs.references;
               classyplate.source = inputs.classyplate;
-              fswatch.source = inputs.fswatch;
               # Diff.source = "0.3.4";
               Cabal.source = "3.2.1.0";
               Glob.source = "0.9.3";
@@ -86,7 +87,6 @@
               recv.source = "0.0.0";
               network.source = "3.1.2.8";
               aeson.source = "1.5.4.1";
-              haskeline.source = "0.8.0.0";
               th-abstraction.source = "0.4.5.0";
               strict.source = "0.4.0.1";
               dlist.source = "0.8.0.8";
