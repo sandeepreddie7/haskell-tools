@@ -10,7 +10,6 @@
     inspection-testing.flake = false;
     inspection-testing.url = "github:nomeata/inspection-testing/18f40a0be7d78a23a344c1f94034bed645985915";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    references.flake = true;
     references.url = "github:eswar2001/references/35912f3cc72b67fa63a8d59d634401b79796469e";
   };
   outputs =
@@ -68,10 +67,10 @@
           haskellProjects.default = {
             imports = [
               inputs.fswatch.haskellFlakeProjectModules.output
+              inputs.references.haskellFlakeProjectModules.output
             ];
             basePackages = pkgs.haskell.packages.ghc8107-perf-events;
             packages = {
-              references.source = inputs.references;
               classyplate.source = inputs.classyplate;
               # Diff.source = "0.3.4";
               Cabal.source = "3.2.1.0";
