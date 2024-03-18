@@ -33,6 +33,9 @@ mkDefaultDecl = mkAnn ("default (" <> child <> ")") . UDefaultDecl . mkAnnList (
 mkTypeSigDecl :: TypeSignature -> Decl
 mkTypeSigDecl = mkAnn child . UTypeSigDecl
 
+mkTypeSigDeclForRanged :: TypeSignature' -> Decl'
+mkTypeSigDeclForRanged = mkAnn' child . UTypeSigDecl
+
 -- | Creates a function or value binding (@ f x = 12 @)
 mkValueBinding :: ValueBind -> Decl
 mkValueBinding = mkAnn child . UValueBinding

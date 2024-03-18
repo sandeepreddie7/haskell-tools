@@ -71,6 +71,9 @@ mkLocalBinds = mkAnnMaybe (relativeIndented 2 $ after "\nwhere " opt)
 mkLocalBinds' :: [LocalBind] -> LocalBinds
 mkLocalBinds' = mkAnn (" where " <> child) . ULocalBinds . mkAnnList (indented list)
 
+mkLocalBindsForRanged :: [LocalBind'] -> LocalBinds'
+mkLocalBindsForRanged = mkAnn' (" where " <> child) . ULocalBinds . mkAnnList' (indented list)
+
 -- | Creates a local binding for a value
 mkLocalValBind :: ValueBind -> LocalBind
 mkLocalValBind = mkAnn child . ULocalValBind
@@ -89,6 +92,9 @@ mkLocalFixity = mkAnn child . ULocalFixity
 -- | Creates a type signature (@ f :: Int -> Int @)
 mkTypeSignature :: Name -> Type -> TypeSignature
 mkTypeSignature n t = mkAnn (child <> " :: " <> child) (UTypeSignature (mkAnnList (separatedBy ", " list) [n]) t)
+
+mkTypeSignatureForRanged :: Name' -> Type' -> TypeSignature'
+mkTypeSignatureForRanged n t = mkAnn' (child <> " :: " <> child) (UTypeSignature (mkAnnList' (separatedBy ", " list) [n]) t)
 
 -- | Creates a left-associative fixity declaration (@ infixl 5 +, - @).
 mkInfixL :: Int -> Operator -> FixitySignature

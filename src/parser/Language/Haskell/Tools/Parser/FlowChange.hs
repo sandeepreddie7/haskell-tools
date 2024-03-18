@@ -213,17 +213,36 @@ getModFunctionList moduleAST modName = do
                     funDeps <- getAllFunctionDeps val k
                     pure $ (k, funDeps)) allFuns
 
-    let updateMods = map (\(k,v) -> (k,(concat $ mapWithModName v (HM.fromList allFuns) moduleAST modName))) (originalList)
+    updateMods <- mapM (\(k,v) -> do
+                      val <- mapWithModName v (HM.fromList allFuns) moduleAST modName
+                      pure (k,(concat val))) (originalList)
     -- print importHMQ
     pure updateMods
     where
         mapWithModName funList allFuns moduleAST modName = do
             let importHM = foldl' (\acc x -> GFT.parseImportsAndGetModule x acc) HM.empty $ (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
             let importHMQ = foldl' (\acc x -> GFT.parseImportsAndGetQualModule x acc) HM.empty $ (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
-            map (\(fun@(x,y)) -> case (snd <$> HM.lookup (y) importHM) <|> (HM.lookup (fromMaybe "" x) importHMQ) of
+            -- importHMQAll <- foldM (\acc x -> parseModsAndGetFuns x acc) HM.empty $ (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
+            -- print (importHM,importHMQ)
+            pure $ map (\(fun@(x,y)) -> case (snd <$> HM.lookup (y) importHM) <|> (HM.lookup (fromMaybe "" x) importHMQ)of
                                     Just imp -> (imp,y)
                                     Nothing -> ("",y)) <$> funList
 
+parseModsAndGetFuns :: Ann UImportDecl (Dom GhcPs) SrcTemplateStage -> HM.HashMap String [String] -> IO (HM.HashMap String [String])
+parseModsAndGetFuns expr@(Ann _ (UImportDecl _ _ _ _ moduleName qualifiedName specs)) hm = do
+   case GFT.getModuleName moduleName of
+    Just modName -> do
+        emodAst <- try $ moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src" (HT.trace ("Iam here" ++ show modName) modName)
+        case emodAst of
+            Right modAst -> do
+                let allFuns = mapMaybe (\x -> traverseOverSigBind x ) (modAst ^? biplateRef)
+                pure $ HM.insert modName allFuns hm
+            Left (e :: SomeException) -> pure hm
+    Nothing -> HT.trace ("Iam here" ++ show expr) $ pure hm
+
+traverseOverSigBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe String
+traverseOverSigBind expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) _)))) = getNamePart $ head names
+traverseOverSigBind _ = Nothing
 
 getAllFunctionDeps :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> String -> IO [[(Maybe String, String)]]
 getAllFunctionDeps moduleAST funName = do

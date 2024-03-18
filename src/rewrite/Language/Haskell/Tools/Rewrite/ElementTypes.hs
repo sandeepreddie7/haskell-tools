@@ -234,6 +234,7 @@ type FixitySignature = Ann UFixitySignature IdDom SrcTemplateStage
 
 -- | A type signature (@ f :: Int -> Int @)
 type TypeSignature = Ann UTypeSignature IdDom SrcTemplateStage
+type TypeSignature' = Ann UTypeSignature (Dom GhcPs) SrcTemplateStage
 
 -- * Types
 
