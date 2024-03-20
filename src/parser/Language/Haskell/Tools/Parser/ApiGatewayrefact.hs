@@ -90,7 +90,118 @@ validationRefactor modulePath moduleName = do
     allFunsSigs <- getAllFunSigs
     let allFunsTobeModfied = concat $ mapMaybe (getAllSigsWithName allFunsSigs) (moduleAST ^? biplateRef)
     newAST <- (!~) (biplateRef) (traverseOverUValBind allFunsTobeModfied) (moduleAST)
+    writeFile "modified" (show newAST)
+
+transformsRefact :: String -> String -> IO ()
+transformsRefact modulePath moduleName = do
+    moduleAST <- moduleParser modulePath moduleName
+    let allRequestType = nub $ mapMaybe (getAllRequestType) (moduleAST ^? biplateRef)
+    transAST <- moduleParser modulePath ""
+    flowAST <- moduleParser modulePath ""
+    let allFunSigns = concat $ nub $ mapMaybe (getAllTypeSignature allRequestType) (transAST ^? biplateRef)
+    -- newAST <- (!~) (biplateRef) (changeDot) (flowAST)
+    newAST <- (!~) (biplateRef) (getAllTransformBinds transAST allFunSigns allRequestType flowAST) (flowAST)
+    -- let allTrans = mapMaybe (getAllTransformBinds flowAST allFunSigns) (flowAST ^? biplateRef)
+    print allRequestType
+    print allFunSigns
+    -- print allTrans
     writeFile "modified" (prettyPrint newAST)
+
+
+-- changeDot :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage)
+-- changeDot expr@(Ann _ (UInfixApp ex1 (Ann _ (UNormalOp _)) ex2)) = pure $ mkParenForRanged expr
+-- changeDot expr = pure expr
+
+getAllTypeSignature :: [String] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe [String]
+getAllTypeSignature reqTypes expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) typeArg)))) = do
+    let allArgs = mapMaybe (getAllTypeArgs) (typeArg ^? biplateRef)
+    if (last allArgs) `elem` reqTypes then Just (mapMaybe getNamePart names) else Nothing
+getAllTypeSignature _ _ = Nothing
+
+getAllTypeArgs :: Ann UType (Dom GhcPs) SrcTemplateStage -> Maybe String
+getAllTypeArgs expr@(Ann _ (UTyVar (Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart ex)))))))) = Just ex
+getAllTypeArgs _ = Nothing
+
+getAllRequestType :: Ann UType (Dom GhcPs) SrcTemplateStage -> Maybe String
+getAllRequestType expr@(Ann _ (UTyApp (Ann _ (UTyApp (Ann _ (UTyVar (Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart "ReqBody")))))))) _)) (Ann _ (UTyVar (Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart ex)))))))) )) = Just ex
+getAllRequestType _ = Nothing
+
+getAllTransformBinds :: _ -> [String] -> [String] -> _ -> Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage)
+-- getAllTransformBinds ast filList expr@(Ann _ (UBindStmt stm rhs)) = do
+getAllTransformBinds ast filList allRequestType flowAST expr@(Ann _ (UDo _ (AnnListG _ stmts))) = do
+    -- print ("hello" ++ show bindNames)
+    -- let names = mapMaybe getNamePart (stmts ^? biplateRef)
+    val <- mapM (changeFun ast filList allRequestType stmts) stmts
+    let allBinds = fst <$> val
+        getAllFunsInBinds = concat $ concat $ filter (\x -> length x == 1) <$> ( filter (not . null) allBinds)
+    let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) <$> ( filter (not . null) allBinds)
+    let allNeeded = filter (isValid getAllFunsInBinds) stmts
+    -- print ("eswar2" ++ show allNeeded)
+    pure $ mkDoBlock' $ snd <$> val
+    --    filter (drop 1 bindNames)
+    -- Just ((head $ head bindNames),if any (\x -> x `elem` filList) names then (drop 1 bindNames) else [])
+getAllTransformBinds _ _ _ _ expr = pure expr
+
+changeFun :: _ -> [String] -> [String] -> _ -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> IO ([[String]],Ann UStmt (Dom GhcPs) SrcTemplateStage)
+changeFun ast funList allRequestType dostms expr@(Ann _ (UBindStmt stm rhs)) = do
+    let bindNames = fromMaybe [[""]] $ getAllExprNamePart (head $ rhs ^? biplateRef)
+        getAllFunsInBinds = concat $ filter (\x -> length x == 1) (drop 1 bindNames)
+    let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) (drop 1 bindNames)
+    let allNeeded = filter (isValid getAllFunsInBinds) dostms
+    modifyTransAst <- (!~) (biplateRef) (changeFunSig (head $ head bindNames) allRequestType allNeeded (drop 1 bindNames)) (ast)
+    writeFile "modifiedTrans" (prettyPrint modifyTransAst)
+    print bindNames
+    pure $ if any (\x -> x `elem` funList) (head bindNames) then (drop 1 bindNames , mkBindStmtForRanged stm (mkAppForGhcPs (mkVar' $ mkName' (head $ head bindNames)) (mkVar' $ mkName' "request") )) else ([],expr)
+changeFun _ _  _ _ expr = pure ([],expr)
+
+changeFunSig :: String -> [String] -> _ -> [[String]] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> IO (Ann UDecl (Dom GhcPs) SrcTemplateStage)
+changeFunSig funName allRequestType stmts bindNames expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) typeArg)))) =
+    if any (==funName) (mapMaybe getNamePart names) then do
+        let allNames = mapMaybe getNamePart (typeArg ^? biplateRef)
+        let typeName = concat $ filter (\x -> x `elem` allRequestType) allNames
+        pure $ mkTypeSigDeclForRanged $ mkTypeSignatureForRanged (mkName' funName) (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkVarTypeForRanged $ mkName' "_") (mkVarTypeForRanged $ mkName' "_")) (mkVarTypeForRanged $ mkName' "_")) (mkVarTypeForRanged $ mkName' ("L.Flow " ++ typeName)))
+    else pure expr
+changeFunSig funName allRequestType stmts bindNames expr@(Ann _ (UValueBinding exp@(FunctionBind' (ex)))) = do
+    if any (==funName) (mapMaybe getNamePart (ex ^? biplateRef)) then do
+        changedTypeArgs <- (!~) (biplateRef) (changeArgs) (expr)
+        let allArgs = head $ mapMaybe (getAllArgs) (expr ^? biplateRef)
+        let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) (bindNames)
+        let mappings = zip allArgs allNames
+        let newArgsStmts = mkLetStmt' $ map (\(arg,val) -> mkLocalValBind' $  mkSimpleBind'' (mkName' arg) (mkVar' $ mkName' val)) $ filter (\(x,y) -> x /= y) mappings
+        val <- (!~) (biplateRef) (addStmts (stmts ++ [newArgsStmts])) (changedTypeArgs)
+        pure val
+    else pure expr
+changeFunSig _ _ _ _ expr = pure expr
+
+addStmts :: _ -> Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage)
+addStmts stmt expr@(Ann _ (UDo val (AnnListG _ stmts))) = pure $ mkDoBlock' (stmt ++ stmts)
+addStmts _ expr = pure expr
+
+getAllArgs :: Ann UMatchLhs (Dom GhcPs) SrcTemplateStage -> Maybe [String]
+getAllArgs expr@(Ann _ (UNormalLhs ex1 (AnnListG _ pats))) = do
+    let allPats = (mapMaybe getPatternName' pats)
+    Just $ concat allPats
+getAllArgs expr = Nothing
+
+changeArgs :: Ann UMatchLhs (Dom GhcPs) SrcTemplateStage -> IO (Ann UMatchLhs (Dom GhcPs) SrcTemplateStage)
+changeArgs expr@(Ann _ (UNormalLhs ex1 (AnnListG _ pats))) = do
+    let allpats = (mapMaybe getPatternName' pats)
+    let pat1 = [mkVarPat' $ mkName' "request", mkVarPat' $ mkName' "accountDetails", mkVarPat' $ mkName' "validationPayload"]
+    pure $ mkMatchLhs' ex1 pat1
+changeArgs expr = pure expr
+
+getAllExprNamePart :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> Maybe [[String]]
+getAllExprNamePart expr@(Ann _ (UInfixApp lhs op (Ann _ (UVar ex)))) = do
+    let namePart = (mapMaybe getNamePart (lhs ^? biplateRef))
+    Just $ ((fromMaybe [] $ getAllExprNamePart lhs) ++ [[last namePart] ++ mapMaybe getNamePart [ex]])
+getAllExprNamePart expr@(Ann _ (UInfixApp lhs op rhs)) = do
+    let namePart = (mapMaybe getNamePart (lhs ^? biplateRef))
+    let namePartRhs = (mapMaybe getNamePart (rhs ^? biplateRef))
+    Just ((fromMaybe [] $ getAllExprNamePart lhs) ++ (fromMaybe [] $ getAllExprNamePart rhs) ++ [[last namePart] ++ [head namePartRhs]])
+getAllExprNamePart expr@(Ann _ (UParen ex)) = Just $ [mapMaybe getNamePart (ex ^? biplateRef)]
+getAllExprNamePart expr@(Ann _ (UApp lhs rhs)) = Just ((fromMaybe [] $ getAllExprNamePart lhs) ++ (fromMaybe [] $ getAllExprNamePart rhs))
+getAllExprNamePart expr@(Ann _ (UVar ex)) = Just $ [mapMaybe getNamePart [ex]]
+getAllExprNamePart expr = Nothing
 
 traverseOverUValBind :: [String] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> IO (Ann UDecl (Dom GhcPs) SrcTemplateStage)
 traverseOverUValBind modFunList expr@(Ann _ (UValueBinding exp@(FunctionBind' (ex)))) = do
@@ -116,7 +227,7 @@ getFunctionNameFromValBind expr@(Ann _ (UNormalLhs (Ann _ (UNormalName (Ann _ (U
 getFunctionNameFromValBind _ = Nothing
 
 getAllFunSigs = do
-    moduleAST <- moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src/" "Euler.API.Gateway.Gateway.Common"
+    moduleAST <- moduleParser "" ""
     pure $ mapMaybe getAllSigs (moduleAST ^? biplateRef)
 
 
@@ -154,12 +265,12 @@ isValid :: [String] -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> Bool
 isValid filList expr@(Ann _ (UBindStmt stm _)) = do
     let bindNames = fromMaybe [] $ getPatternName' stm
     any (\x -> x `elem` filList) bindNames
-isValid _ _ = True
+isValid _ _ = False
 
 isUsed :: [String] -> Ann ULocalBind (Dom GhcPs) SrcTemplateStage -> Bool
 isUsed allFuns expr@(Ann _ (ULocalValBind (Ann _ (USimpleBind pat _ _)))) =
     let bindNames = fromMaybe [] $ getPatternName' pat
-    in any (\x -> x `elem` (trace ("funcheck" ++ show allFuns ++ show x) allFuns)) bindNames
+    in any (\x -> x `elem` (allFuns)) bindNames
 isUsed _ _ = True
 
 gatAllCases :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage) 
