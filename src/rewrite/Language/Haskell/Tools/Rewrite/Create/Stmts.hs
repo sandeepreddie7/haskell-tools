@@ -14,6 +14,9 @@ import Language.Haskell.Tools.Rewrite.ElementTypes
 mkBindStmt :: Pattern -> Expr -> Stmt
 mkBindStmt bound expr = mkAnn (child <> " <- " <> child) $ UBindStmt bound expr
 
+mkBindStmtForRanged :: Pattern' -> Expr' -> Stmt'
+mkBindStmtForRanged bound expr = mkAnn' (child <> " <- " <> child) $ UBindStmt bound expr
+
 -- | Creates a non-binding statement (@ action @)
 mkExprStmt :: Expr -> Stmt
 mkExprStmt = mkAnn child . UExprStmt

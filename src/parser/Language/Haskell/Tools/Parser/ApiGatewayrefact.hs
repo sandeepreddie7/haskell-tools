@@ -98,15 +98,71 @@ transformsRefact modulePath moduleName = do
     let allRequestType = nub $ mapMaybe (getAllRequestType) (moduleAST ^? biplateRef)
     transAST <- moduleParser modulePath ""
     flowAST <- moduleParser modulePath ""
+    routesAST <- moduleParser modulePath ""
     let allFunSigns = concat $ nub $ mapMaybe (getAllTypeSignature allRequestType) (transAST ^? biplateRef)
-    -- newAST <- (!~) (biplateRef) (changeDot) (flowAST)
+    let allFunsOfRoutes = mapMaybe (\x -> traverseOverSigBind x ) (routesAST ^? biplateRef)
+    let allFunsNamesOfFlows = mapMaybe (\x -> traverseOverSigBindWithCheck allFunsOfRoutes x ) (flowAST ^? biplateRef)
     newAST <- (!~) (biplateRef) (getAllTransformBinds transAST allFunSigns allRequestType flowAST) (flowAST)
-    -- let allTrans = mapMaybe (getAllTransformBinds flowAST allFunSigns) (flowAST ^? biplateRef)
-    print allRequestType
-    print allFunSigns
-    -- print allTrans
-    writeFile "modified" (prettyPrint newAST)
+    newASTFlows <- (!~) (biplateRef) (getAllRoutesValBinds allFunsOfRoutes allFunsNamesOfFlows) (flowAST)
+    writeFile "modified" (prettyPrint (newASTFlows))
 
+addTypeSigArgs :: Ann UType (Dom GhcPs) SrcTemplateStage -> IO (Ann UType (Dom GhcPs) SrcTemplateStage)
+addTypeSigArgs expr@(Ann _ (UTyFun ex1 ex2)) = do
+    let newType1 = mkVarTypeForRanged $ mkName' "_"
+    let newType2 = mkVarTypeForRanged $ mkName' "_"
+    let newType3 = mkVarTypeForRanged $ mkName' "_"
+    let newType4 = mkVarTypeForRanged $ mkName' "_"
+    let newType5 = mkVarTypeForRanged $ mkName' "_"
+        combinedType = mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkFunctionTypeForRanged newType1 newType2) newType3) newType4) newType5
+        combinedTypeWithOrg = mkFunctionTypeForRanged combinedType ex2
+        completeType = mkFunctionTypeForRanged ex1 combinedTypeWithOrg
+    pure completeType
+addTypeSigArgs expr = pure expr
+
+getAllRoutesValBinds :: [String] -> [String] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> IO (Ann UDecl (Dom GhcPs) SrcTemplateStage)
+getAllRoutesValBinds allFunsOfRoutes allFunsNamesOfFlows expr@(Ann _ (UValueBinding (FunctionBind' ex))) = do
+    newAST <- (!~) (biplateRef) (getAllRoutesBinds allFunsOfRoutes) (expr)
+    pure newAST
+getAllRoutesValBinds allFunsOfRoutes allFunsNamesOfFlows expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) typeArg)))) = do
+    args <- (!~) (biplateRef) (addTypeSigArgs) (typeArg)
+    pure $ if (head $ mapMaybe getNamePart names) `elem` allFunsNamesOfFlows then mkTypeSigDeclForRanged $ mkTypeSignatureForRanged (mkName' ("handleResponse" ++ (head $ mapMaybe getNamePart names))) args else expr
+
+getAllRoutesValBinds _ _ expr = pure expr
+
+
+getAllRoutesBinds :: [String] -> Ann UMatch (Dom GhcPs) SrcTemplateStage -> IO (Ann UMatch (Dom GhcPs) SrcTemplateStage)
+getAllRoutesBinds allFunsOfRoutes expr@(Ann _ (UMatch lhs@(Ann _ (UNormalLhs lhsName args)) (Ann _ (UUnguardedRhs (Ann _ (UDo _ (AnnListG _ stmts))))) (AnnMaybeG _ binds) )) = do
+    let allBindsWithRoutes = mapMaybe (\x -> getAllBindsWithRoutes allFunsOfRoutes x ) (expr ^? biplateRef)
+    -- print allBindsWithRoutes
+    let handlerespCase = filter (getHandleRspCase (concat allBindsWithRoutes) ) (expr ^? biplateRef)
+    print (handlerespCase, length stmts)
+    if not $ null $ concat $ allBindsWithRoutes then
+      pure $ mkMatchForRanged (mkMatchLhs' (mkName' $ "handleResponse" ++ (fromMaybe "" $ getNamePart lhsName)) ([mkVarPat' $ mkName' "request", mkVarPat' $ mkName' "vPayload", mkVarPat' $ mkName' "accountDetails",mkVarPat' $ mkName' "gwRequest", mkVarPat' $ mkName' "authPayload",mkVarPat' $ mkName' $ head $ concat allBindsWithRoutes ])) (mkUnguardedRhs' (mkDoBlock' handlerespCase)) binds
+      else pure expr
+getAllRoutesBinds _ expr = pure expr
+
+getAllBindsWithRoutes :: [String] -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> Maybe [String]
+getAllBindsWithRoutes allRoutesFun expr@(Ann _ (UBindStmt stm rhs)) = do
+    let allNames = mapMaybe getNamePart (expr ^? biplateRef)
+    let bindNames = fromMaybe [] $ getPatternName' stm
+    if any (\x -> x `elem` allRoutesFun) allNames then Just bindNames else Nothing
+getAllBindsWithRoutes _ _ = Nothing
+
+
+getHandleRspCase :: [String] -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> Bool
+getHandleRspCase allRoutesCall expr@(Ann _ (UExprStmt (Ann _ (UCase casePat (AnnListG _ pats))))) = do
+    let caseName = mapMaybe getNamePart (casePat ^? biplateRef)
+    (trace $ show (caseName, allRoutesCall, any (\x -> x `elem` allRoutesCall) caseName)) $ any (\x -> x `elem` allRoutesCall) caseName
+getHandleRspCase _ expr = trace (show expr) $ False
+
+-- handleResponseRtefact :: 
+traverseOverSigBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe String
+traverseOverSigBind expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) _)))) = getNamePart $ head names
+traverseOverSigBind _ = Nothing
+
+traverseOverSigBindWithCheck :: [String] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe String
+traverseOverSigBindWithCheck allRoutesFun expr@(Ann _ (UValueBinding (FunctionBind' ex))) = if any (\x -> x `elem` allRoutesFun ) $ mapMaybe  getNamePart (ex ^? biplateRef) then Just $ head $ mapMaybe  getNamePart (ex ^? biplateRef) else Nothing
+traverseOverSigBindWithCheck _ _ = Nothing
 
 -- changeDot :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage)
 -- changeDot expr@(Ann _ (UInfixApp ex1 (Ann _ (UNormalOp _)) ex2)) = pure $ mkParenForRanged expr

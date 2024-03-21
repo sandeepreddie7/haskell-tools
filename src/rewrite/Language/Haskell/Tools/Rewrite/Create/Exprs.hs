@@ -114,7 +114,8 @@ mkParArray exprs = mkAnn ("[: " <> child <> " :]") $ UParArray (mkAnnList (separ
 mkParen :: Expr -> Expr
 mkParen = mkAnn ("(" <> child <> ")") . UParen
 
-
+mkParenForRanged :: Expr' -> Expr'
+mkParenForRanged = mkAnn' ("(" <> child <> ")") . UParen
 -- | Create a left operator section: @(1+)@
 mkLeftSection :: Expr -> Operator -> Expr
 mkLeftSection lhs op = mkAnn ("(" <> child <> " " <> child <> ")") $ ULeftSection lhs op
