@@ -21,6 +21,9 @@ mkBindStmtForRanged bound expr = mkAnn' (child <> " <- " <> child) $ UBindStmt b
 mkExprStmt :: Expr -> Stmt
 mkExprStmt = mkAnn child . UExprStmt
 
+mkExprStmtForRanged :: Expr' -> Stmt'
+mkExprStmtForRanged = mkAnn' child . UExprStmt
+
 -- | Creates a let statement (@ let x = 3; y = 4 @)
 mkLetStmt :: [LocalBind] -> Stmt
 mkLetStmt = mkAnn ("let " <> child) . ULetStmt . mkAnnList (indented list)

@@ -90,21 +90,32 @@ validationRefactor modulePath moduleName = do
     allFunsSigs <- getAllFunSigs
     let allFunsTobeModfied = concat $ mapMaybe (getAllSigsWithName allFunsSigs) (moduleAST ^? biplateRef)
     newAST <- (!~) (biplateRef) (traverseOverUValBind allFunsTobeModfied) (moduleAST)
-    writeFile "modified" (show newAST)
+    writeFile "modified" (prettyPrint newAST)
 
 transformsRefact :: String -> String -> IO ()
 transformsRefact modulePath moduleName = do
     moduleAST <- moduleParser modulePath moduleName
     let allRequestType = nub $ mapMaybe (getAllRequestType) (moduleAST ^? biplateRef)
-    transAST <- moduleParser modulePath ""
-    flowAST <- moduleParser modulePath ""
-    routesAST <- moduleParser modulePath ""
+    transAST <- moduleParser modulePath "Euler.API.Gateway.Gateway.Adyen.Transforms.Transaction"
+    flowAST <- moduleParser modulePath "Euler.API.Gateway.Gateway.Adyen.Flow.CaptureVoid"
+    routesAST <- moduleParser modulePath "Euler.API.Gateway.Gateway.Adyen.Routes"
     let allFunSigns = concat $ nub $ mapMaybe (getAllTypeSignature allRequestType) (transAST ^? biplateRef)
     let allFunsOfRoutes = mapMaybe (\x -> traverseOverSigBind x ) (routesAST ^? biplateRef)
     let allFunsNamesOfFlows = mapMaybe (\x -> traverseOverSigBindWithCheck allFunsOfRoutes x ) (flowAST ^? biplateRef)
-    newAST <- (!~) (biplateRef) (getAllTransformBinds transAST allFunSigns allRequestType flowAST) (flowAST)
-    newASTFlows <- (!~) (biplateRef) (getAllRoutesValBinds allFunsOfRoutes allFunsNamesOfFlows) (flowAST)
-    writeFile "modified" (prettyPrint (newASTFlows))
+    newAST <- mapM (getAllTransformBinds HM.empty allFunSigns allRequestType flowAST) (flowAST ^? biplateRef)
+    let neededHM = HM.unions $ HM.unions <$> fst <$> newAST
+    -- newASTFlows <- (!~) (biplateRef) (getAllRoutesValBinds allFunsOfRoutes allFunsNamesOfFlows) (flowAST)
+    modifyTransAst <- (!~) (biplateRef) (changeFunSig neededHM allRequestType) (transAST)
+    let allTrans = HM.keys neededHM
+    modifyFlowAst <- (!~) (biplateRef) (changeFlowFun allTrans) (flowAST)
+    newASTFlows <- (!~) (biplateRef) (getAllRoutesValBinds allFunsOfRoutes allFunsNamesOfFlows) (modifyFlowAst)
+    print allFunsOfRoutes
+    print allFunSigns
+    print allFunsNamesOfFlows
+    writeFile "modified" (show (neededHM))
+    writeFile "modified.hs" (prettyPrint (modifyTransAst))
+    writeFile "modifiedNew.hs" (prettyPrint (modifyFlowAst))
+    writeFile "modifiedHandle.hs" (prettyPrint (newASTFlows))
 
 addTypeSigArgs :: Ann UType (Dom GhcPs) SrcTemplateStage -> IO (Ann UType (Dom GhcPs) SrcTemplateStage)
 addTypeSigArgs expr@(Ann _ (UTyFun ex1 ex2)) = do
@@ -135,7 +146,7 @@ getAllRoutesBinds allFunsOfRoutes expr@(Ann _ (UMatch lhs@(Ann _ (UNormalLhs lhs
     let allBindsWithRoutes = mapMaybe (\x -> getAllBindsWithRoutes allFunsOfRoutes x ) (expr ^? biplateRef)
     -- print allBindsWithRoutes
     let handlerespCase = filter (getHandleRspCase (concat allBindsWithRoutes) ) (expr ^? biplateRef)
-    print (handlerespCase, length stmts)
+    -- print (handlerespCase, length stmts)
     if not $ null $ concat $ allBindsWithRoutes then
       pure $ mkMatchForRanged (mkMatchLhs' (mkName' $ "handleResponse" ++ (fromMaybe "" $ getNamePart lhsName)) ([mkVarPat' $ mkName' "request", mkVarPat' $ mkName' "vPayload", mkVarPat' $ mkName' "accountDetails",mkVarPat' $ mkName' "gwRequest", mkVarPat' $ mkName' "authPayload",mkVarPat' $ mkName' $ head $ concat allBindsWithRoutes ])) (mkUnguardedRhs' (mkDoBlock' handlerespCase)) binds
       else pure expr
@@ -152,8 +163,11 @@ getAllBindsWithRoutes _ _ = Nothing
 getHandleRspCase :: [String] -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> Bool
 getHandleRspCase allRoutesCall expr@(Ann _ (UExprStmt (Ann _ (UCase casePat (AnnListG _ pats))))) = do
     let caseName = mapMaybe getNamePart (casePat ^? biplateRef)
-    (trace $ show (caseName, allRoutesCall, any (\x -> x `elem` allRoutesCall) caseName)) $ any (\x -> x `elem` allRoutesCall) caseName
-getHandleRspCase _ expr = trace (show expr) $ False
+    any (\x -> x `elem` allRoutesCall) caseName
+getHandleRspCase allRoutesCall expr@(Ann _ (UExprStmt (Ann _ (UApp _ (Ann _ (UCase casePat (AnnListG _ pats))))))) = do
+    let caseName = mapMaybe getNamePart (casePat ^? biplateRef)
+    any (\x -> x `elem` allRoutesCall) caseName
+getHandleRspCase _ expr = False
 
 -- handleResponseRtefact :: 
 traverseOverSigBind :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe String
@@ -182,55 +196,118 @@ getAllRequestType :: Ann UType (Dom GhcPs) SrcTemplateStage -> Maybe String
 getAllRequestType expr@(Ann _ (UTyApp (Ann _ (UTyApp (Ann _ (UTyVar (Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart "ReqBody")))))))) _)) (Ann _ (UTyVar (Ann _ (UNormalName (Ann _ (UQualifiedName _ (Ann _ (UNamePart ex)))))))) )) = Just ex
 getAllRequestType _ = Nothing
 
-getAllTransformBinds :: _ -> [String] -> [String] -> _ -> Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage)
--- getAllTransformBinds ast filList expr@(Ann _ (UBindStmt stm rhs)) = do
-getAllTransformBinds ast filList allRequestType flowAST expr@(Ann _ (UDo _ (AnnListG _ stmts))) = do
+getAllTransformBinds :: _ -> [String] -> [String] -> _ -> Ann UMatch (Dom GhcPs) SrcTemplateStage -> IO (_, Ann UExpr (Dom GhcPs) SrcTemplateStage)
+getAllTransformBinds hm filList allRequestType flowAST expr@((Ann _ (UMatch lhs@(Ann _ (UNormalLhs lhsName args)) (Ann _ (UUnguardedRhs (Ann _ (UDo _ (AnnListG _ stmts))))) (AnnMaybeG _ binds) ))) = do
     -- print ("hello" ++ show bindNames)
     -- let names = mapMaybe getNamePart (stmts ^? biplateRef)
-    val <- mapM (changeFun ast filList allRequestType stmts) stmts
-    let allBinds = fst <$> val
-        getAllFunsInBinds = concat $ concat $ filter (\x -> length x == 1) <$> ( filter (not . null) allBinds)
-    let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) <$> ( filter (not . null) allBinds)
-    let allNeeded = filter (isValid getAllFunsInBinds) stmts
+    val <- mapM (changeFun hm filList allRequestType stmts binds) stmts
     -- print ("eswar2" ++ show allNeeded)
-    pure $ mkDoBlock' $ snd <$> val
+    pure $ (fst <$> val, mkDoBlock' $ snd <$> val)
     --    filter (drop 1 bindNames)
     -- Just ((head $ head bindNames),if any (\x -> x `elem` filList) names then (drop 1 bindNames) else [])
-getAllTransformBinds _ _ _ _ expr = pure expr
+getAllTransformBinds hm _ _ _ expr = pure ([hm],mkVar' $ mkName' "")
 
-changeFun :: _ -> [String] -> [String] -> _ -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> IO ([[String]],Ann UStmt (Dom GhcPs) SrcTemplateStage)
-changeFun ast funList allRequestType dostms expr@(Ann _ (UBindStmt stm rhs)) = do
+filterUMatches :: [String] -> Ann ULocalBinds (Dom GhcPs) SrcTemplateStage -> ([Ann ULocalBind (Dom GhcPs) SrcTemplateStage])
+filterUMatches allBinds expr@((Ann _ (ULocalBinds (AnnListG _ matches)))) = do
+    let allMatches = filter (isUsed allBinds) matches
+    (allMatches)
+filterUMatches _ expr = []
+
+changeFun :: _ -> [String] -> [String] -> _ -> _ -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> IO (_,Ann UStmt (Dom GhcPs) SrcTemplateStage)
+changeFun hm funList allRequestType dostms binds expr@(Ann _ (UBindStmt stm rhs)) = do
     let bindNames = fromMaybe [[""]] $ getAllExprNamePart (head $ rhs ^? biplateRef)
         getAllFunsInBinds = concat $ filter (\x -> length x == 1) (drop 1 bindNames)
+    let allNeeded = filter (isValid getAllFunsInBinds) dostms
+        allBinds = maybe [] (filterUMatches getAllFunsInBinds) binds
+    let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) (drop 1 bindNames)
+    let neededHM = HM.insert (head $ head bindNames) ((allNeeded,allBinds),allNames) hm
+    -- modifyTransAst <- (!~) (biplateRef) (changeFunSig (head $ head bindNames) allRequestType allNeeded allNames) (ast)
+    -- writeFile "modifiedTrans" (prettyPrint modifyTransAst)
+    print ("bindNames", bindNames)
+    pure $ if any (\x -> x `elem` funList) (head bindNames) then (neededHM , mkBindStmtForRanged stm (mkAppForGhcPs (mkVar' $ mkName' (head $ head bindNames)) (mkVar' $ mkName' "request") )) else (neededHM,expr)
+changeFun hm funList allRequestType dostms binds expr@(Ann _ (ULetStmt (AnnListG _ stms))) = do
+    val <- mapM (getAllStmts hm funList allRequestType dostms binds) stms
+    -- let hmUnion = foldl'
+    pure (HM.unions $ fst <$> val,mkLetStmt' $ snd <$> val)
+changeFun hm _  _ _ _ expr = pure (hm,expr)
+
+changeFlowFun :: [String] -> Ann UStmt (Dom GhcPs) SrcTemplateStage -> IO (Ann UStmt (Dom GhcPs) SrcTemplateStage)
+changeFlowFun funList expr@(Ann _ (UBindStmt stm rhs)) = do
+    let bindNames = fromMaybe [[""]] $ getAllExprNamePart (head $ rhs ^? biplateRef)
+    pure $ if any (\x -> x `elem` funList) (head bindNames) then ( mkBindStmtForRanged stm (mkAppForGhcPs (mkVar' $ mkName' (head $ head bindNames)) (mkVar' $ mkName' "request") )) else (expr)
+changeFlowFun funList expr@(Ann _ (ULetStmt (AnnListG _ stms))) = do
+    val <- mapM (getAllStmtsFlow funList) stms
+    -- let hmUnion = foldl'
+    pure (mkLetStmt' val)
+changeFlowFun _ expr = pure (expr)
+
+
+getAllStmtsFlow :: [String] -> Ann (ULocalBind) (Dom GhcPs) SrcTemplateStage -> IO (Ann (ULocalBind) (Dom GhcPs) SrcTemplateStage)
+getAllStmtsFlow funList expr@(Ann _ (ULocalValBind (Ann _ (USimpleBind pat rhs (AnnMaybeG _ binds))))) = do
+    let bindNames = fromMaybe [[""]] $ getAllExprNamePart (head $ rhs ^? biplateRef)
+    pure $ if any (\x -> x `elem` funList) (head bindNames) then (mkLocalValBind' $ mkSimpleBinds pat (mkUnguardedRhs' $ mkAppForGhcPs (mkVar' $ mkName' (head $ head bindNames)) (mkVar' $ mkName' "request") ) (binds) ) else (expr)
+getAllStmtsFlow _ expr = trace "EEE" $ pure (expr)
+
+getAllStmts :: _ -> [String] -> [String] -> _ -> _ -> Ann (ULocalBind) (Dom GhcPs) SrcTemplateStage -> IO (_, Ann (ULocalBind) (Dom GhcPs) SrcTemplateStage)
+getAllStmts hm funList allRequestType dostms binds expr@(Ann _ (ULocalValBind (Ann _ (USimpleBind pat rhs (AnnMaybeG _ _))))) = do
+    let bindNames = fromMaybe [[""]] $ getAllExprNamePart (head $ rhs ^? biplateRef)
+    print ("bindNamesLet", funList, bindNames)
+    let getAllFunsInBinds = concat $ filter (\x -> length x == 1) (drop 1 bindNames)
+    let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) (drop 1 bindNames)
+    print ("getAllFunsInBinds", getAllFunsInBinds)
     let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) (drop 1 bindNames)
     let allNeeded = filter (isValid getAllFunsInBinds) dostms
-    modifyTransAst <- (!~) (biplateRef) (changeFunSig (head $ head bindNames) allRequestType allNeeded (drop 1 bindNames)) (ast)
-    writeFile "modifiedTrans" (prettyPrint modifyTransAst)
-    print bindNames
-    pure $ if any (\x -> x `elem` funList) (head bindNames) then (drop 1 bindNames , mkBindStmtForRanged stm (mkAppForGhcPs (mkVar' $ mkName' (head $ head bindNames)) (mkVar' $ mkName' "request") )) else ([],expr)
-changeFun _ _  _ _ expr = pure ([],expr)
+        allBinds = maybe [] (filterUMatches getAllFunsInBinds) binds
+    print ("allNeeded", allNeeded)
+    let neededHM = HM.insert (head $ head bindNames) ((allNeeded,allBinds),allNames) hm
+    -- modifyTransAst <- (!~) (biplateRef) (changeFunSig (head $ head bindNames) allRequestType allNeeded allNames) (ast)
+    -- writeFile "modifiedTrans" (prettyPrint modifyTransAst)
+    pure $ if any (\x -> x `elem` funList) (head bindNames) then (neededHM,mkLocalValBind' $ mkSimpleBinds pat (mkUnguardedRhs' $ mkAppForGhcPs (mkVar' $ mkName' (head $ head bindNames)) (mkVar' $ mkName' "request") ) (binds) ) else (neededHM,expr)
+getAllStmts hm _ _ _ _ expr = trace "EEE" $ pure (hm,expr)
 
-changeFunSig :: String -> [String] -> _ -> [[String]] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> IO (Ann UDecl (Dom GhcPs) SrcTemplateStage)
-changeFunSig funName allRequestType stmts bindNames expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) typeArg)))) =
-    if any (==funName) (mapMaybe getNamePart names) then do
+changeFunSig :: _ -> [String] -> Ann UDecl (Dom GhcPs) SrcTemplateStage -> IO (Ann UDecl (Dom GhcPs) SrcTemplateStage)
+changeFunSig hm allRequestType expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature (AnnListG _ names) typeArg)))) = do
+    let funNames = HM.keys hm
+    if any (\x -> x `elem` funNames) (mapMaybe getNamePart names) then do
+        let name = head $ mapMaybe getNamePart names
         let allNames = mapMaybe getNamePart (typeArg ^? biplateRef)
         let typeName = concat $ filter (\x -> x `elem` allRequestType) allNames
-        pure $ mkTypeSigDeclForRanged $ mkTypeSignatureForRanged (mkName' funName) (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkVarTypeForRanged $ mkName' "_") (mkVarTypeForRanged $ mkName' "_")) (mkVarTypeForRanged $ mkName' "_")) (mkVarTypeForRanged $ mkName' ("L.Flow " ++ typeName)))
+        pure $ mkTypeSigDeclForRanged $ mkTypeSignatureForRanged (mkName' name) (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkFunctionTypeForRanged (mkVarTypeForRanged $ mkName' "_") (mkVarTypeForRanged $ mkName' "_")) (mkVarTypeForRanged $ mkName' "_")) (mkVarTypeForRanged $ mkName' ("L.Flow " ++ typeName)))
     else pure expr
-changeFunSig funName allRequestType stmts bindNames expr@(Ann _ (UValueBinding exp@(FunctionBind' (ex)))) = do
-    if any (==funName) (mapMaybe getNamePart (ex ^? biplateRef)) then do
-        changedTypeArgs <- (!~) (biplateRef) (changeArgs) (expr)
-        let allArgs = head $ mapMaybe (getAllArgs) (expr ^? biplateRef)
-        let allNames = map (\eachVal -> foldl' (\acc val -> if acc == "Just" then acc <> " " <> val else acc <> "." <> val) (head eachVal) (tail eachVal) ) (bindNames)
-        let mappings = zip allArgs allNames
-        let newArgsStmts = mkLetStmt' $ map (\(arg,val) -> mkLocalValBind' $  mkSimpleBind'' (mkName' arg) (mkVar' $ mkName' val)) $ filter (\(x,y) -> x /= y) mappings
-        val <- (!~) (biplateRef) (addStmts (stmts ++ [newArgsStmts])) (changedTypeArgs)
-        pure val
-    else pure expr
-changeFunSig _ _ _ _ expr = pure expr
+changeFunSig hm allRequestType expr@(Ann _ (UValueBinding exp@(FunctionBind' (ex)))) = do
+    let funNames = HM.keys hm
+    if any (\x -> x `elem` funNames) (mapMaybe getNamePart (ex ^? biplateRef)) then do
+        let name = head $ mapMaybe getNamePart (ex ^? biplateRef)
+        case HM.lookup name hm of
+            Just ((stmts,allBinds),allNames) -> do
+                changedTypeArgs <- (!~) (biplateRef) (changeArgs) (expr)
+                let allArgs = head $ mapMaybe (getAllArgs) (expr ^? biplateRef)
+                print ("allArgs",allArgs)
+                let mappings = zip allArgs allNames
+                let newArgsStmts = mkLetStmt' $ map (\(arg,val) -> mkLocalValBind' $  mkSimpleBind'' (mkName' arg) (mkVar' $ mkName' val)) $ filter (\(x,y) -> x /= y) mappings
+                print ("newArgsStmts", newArgsStmts, stmts)
+                val <- (!~) (biplateRef) (addStmts (stmts ++ [newArgsStmts])) (changedTypeArgs)
+                valBinds <- (!~) (biplateRef) (addBindsTrans (allBinds)) (val)
+                print ("newArgsStmtsVal", prettyPrint val)
+                pure valBinds
+            Nothing -> pure expr
+    else do
+        -- print ("ELse", funName, mapMaybe getNamePart (ex ^? biplateRef))
+        pure expr
+changeFunSig _ _ expr = do
+    print expr
+    pure expr
 
-addStmts :: _ -> Ann UExpr (Dom GhcPs) SrcTemplateStage -> IO (Ann UExpr (Dom GhcPs) SrcTemplateStage)
-addStmts stmt expr@(Ann _ (UDo val (AnnListG _ stmts))) = pure $ mkDoBlock' (stmt ++ stmts)
+addBindsTrans :: _ -> Ann UMatch (Dom GhcPs) SrcTemplateStage -> IO (Ann UMatch (Dom GhcPs) SrcTemplateStage)
+addBindsTrans allBinds expr@(Ann _ (UMatch lhs rhs (AnnMaybeG _ x@(Just (Ann _ (ULocalBinds (AnnListG _ matches)))))) ) = do
+      pure $ mkMatchForRanged lhs rhs (Just $ mkLocalBindsForRanged (matches ++ allBinds))
+addBindsTrans allBinds expr@(Ann _ (UMatch lhs rhs (AnnMaybeG _ Nothing)) ) = do
+      pure $ mkMatchForRanged lhs rhs (Just $ mkLocalBindsForRanged (allBinds))
+addBindsTrans _ expr = pure expr
+
+addStmts :: _ -> Ann UMatch (Dom GhcPs) SrcTemplateStage -> IO (Ann UMatch (Dom GhcPs) SrcTemplateStage)
+addStmts allStmts expr@(Ann _ (UMatch lhs (Ann _ (UUnguardedRhs (Ann _ (UDo val (AnnListG _ stmts))))) (AnnMaybeG _ binds)) ) = pure $ mkMatchForRanged lhs (mkUnguardedRhs' $ mkDoBlock' (allStmts ++ stmts)) binds
+addStmts allStmts expr@(Ann _ (UMatch lhs (Ann _ (UUnguardedRhs ex)) (AnnMaybeG _ binds)) ) = pure $ mkMatchForRanged lhs (mkUnguardedRhs' $ mkDoBlock' (allStmts ++ ([mkExprStmtForRanged ex]))) binds
 addStmts _ expr = pure expr
 
 getAllArgs :: Ann UMatchLhs (Dom GhcPs) SrcTemplateStage -> Maybe [String]
@@ -283,7 +360,7 @@ getFunctionNameFromValBind expr@(Ann _ (UNormalLhs (Ann _ (UNormalName (Ann _ (U
 getFunctionNameFromValBind _ = Nothing
 
 getAllFunSigs = do
-    moduleAST <- moduleParser "" ""
+    moduleAST <- moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src/" "Euler.API.Gateway.Gateway.Common"
     pure $ mapMaybe getAllSigs (moduleAST ^? biplateRef)
 
 
