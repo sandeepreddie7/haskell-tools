@@ -11,6 +11,7 @@ type AnnMaybe node = AnnMaybeG node IdDom SrcTemplateStage
 -- | The representation of a haskell module, that is a separate compilation unit.
 -- It may or may not have a header.
 type Module = Ann UModule IdDom SrcTemplateStage
+type Module' = Ann UModule (Dom GhcPs) SrcTemplateStage
 
 -- | Module declaration with name and (optional) exports
 type ModuleHead = Ann UModuleHead IdDom SrcTemplateStage
@@ -39,6 +40,7 @@ type ModulePragma' = Ann UModulePragma (Dom GhcPs) SrcTemplateStage
 
 -- | Pragmas that must be used before defining the module
 type FilePragma = Ann UFilePragma IdDom SrcTemplateStage
+type FilePragma' = Ann UFilePragma (Dom GhcPs) SrcTemplateStage
 
 -- | An import declaration: @import Module.Name@
 type ImportDecl = Ann UImportDecl IdDom SrcTemplateStage
