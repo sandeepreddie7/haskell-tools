@@ -21,6 +21,12 @@ mkModule filePrags head imps decls
       $ UModule (mkAnnList (followedBy "\n" $ separatedBy "\n" list) filePrags) (mkAnnMaybe opt head)
                 (mkAnnList (after "\n" $ indented list) imps) (mkAnnList (after "\n" $ indented list) decls)
 
+mkModule' :: [FilePragma'] -> Maybe ModuleHead' -> [ImportDecl'] -> [Decl'] -> Module'
+mkModule' filePrags head imps decls
+  = mkAnn' (child <> child <> child <> child)
+      $ UModule (mkAnnList' (followedBy "\n" $ separatedBy "\n" list) filePrags) (mkAnnMaybe' opt head)
+                (mkAnnList' (after "\n" $ indented list) imps) (mkAnnList' (after "\n" $ indented list) decls)
+
 -- | Module declaration with name and (optional) exports
 mkModuleHead :: ModuleName -> Maybe ModulePragma -> Maybe ExportSpecs -> ModuleHead
 mkModuleHead n pr es = mkAnn ("module " <> child <> child <> child <> " where")
