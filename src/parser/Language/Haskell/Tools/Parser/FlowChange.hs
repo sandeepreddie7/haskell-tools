@@ -228,8 +228,23 @@ getModFunctionList moduleAST modName = do
 getAllFunctionDeps :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> String -> IO [[(Maybe String, String)]]
 getAllFunctionDeps moduleAST funName = do
     let funDepsList =  mapMaybe (\x -> GFT.traverseOverUValBind x funName ) (moduleAST ^? biplateRef)
-    let originalList = concat $ map (GFT.getRhsName') (funDepsList ^? biplateRef)
+        originalList = map (getRhsName') (funDepsList ^? biplateRef)
     pure originalList
+
+getRhsName' :: Ann UValueBind (Dom GhcPs) SrcTemplateStage -> [(Maybe String,String)]
+getRhsName' expr@(Ann _ (UFunBind (AnnListG _ match))) =
+  if null match then [] else
+    let (Ann _ (UMatch lhs rhs _)) = head match
+        args = concat $ map GFT.getLhsArgs (lhs ^? biplateRef)
+        pats = concat $ mapMaybe GFT.getPatternName (rhs ^? biplateRef)
+        fieldNames = pats ++ (mapMaybe GFT.getRecFieldNames (rhs ^? biplateRef))
+        lenses = args ++ fieldNames ++ (mapMaybe GFT.getLenses (rhs ^? biplateRef))
+    in tail $ filter (\(x,y) -> not $ y `elem` lenses) $ mapMaybe (GFT.getNamePartWithQ) (expr ^? biplateRef)
+getRhsName' (expr@(Ann _ (USimpleBind pat rhs _))) =
+    let pats = concat $ mapMaybe GFT.getPatternName (rhs ^? biplateRef)
+        fieldNames = pats ++ (mapMaybe GFT.getRecFieldNames (rhs ^? biplateRef))
+        lenses =  fieldNames ++ (mapMaybe GFT.getLenses (rhs ^? biplateRef))
+    in tail $ filter (\(x,y) -> not $ y `elem` lenses) $ mapMaybe (GFT.getNamePartWithQ) (expr ^? biplateRef)
 
 getFunctionNameFromSimpleBind :: String -> Ann UValueBind (Dom GhcPs) SrcTemplateStage -> Maybe String
 getFunctionNameFromSimpleBind str expr@(Ann _ (USimpleBind pat _ _)) = 
