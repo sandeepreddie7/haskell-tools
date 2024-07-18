@@ -10,7 +10,7 @@ data Options =
     { optCommand :: ParseConfig
     }
 
-data ASTRefactors = FunctionDependency | LetRefactoring
+data ASTRefactors = FunctionDependency | LetRefactoring | RemoveWildCards
   deriving (Show)
 
 data ParseConfig = Refact ASTParseConfig | SplitAndWrite WriteFileConfig

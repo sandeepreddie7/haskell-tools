@@ -147,10 +147,10 @@ trfExpr' (ExplicitList _ _ exprs) = AST.UList <$> trfAnnList' ", " trfExpr exprs
 -- trfExpr' (ExplicitPArr _ exprs) = AST.UParArray <$> trfAnnList' ", " trfExpr exprs
 trfExpr' (RecordCon _ name fields) = AST.URecCon <$> trfName @n name <*> trfFieldInits fields
 trfExpr' (RecordUpd _ expr fields) = AST.URecUpdate <$> trfExpr expr <*> trfAnnList ", " trfFieldUpdate fields
--- trfExpr' (ExprWithTySig _ expr typ) =
---   let g :: LHsType (GhcPass (NoGhcTcPass p)) -> LHsType (GhcPass p)
---       g = unsafeCoerce
---     in AST.UTypeSig <$> trfExpr expr <*> trfType (g $ hsib_body $ hswc_body typ) --TODO:
+trfExpr' (ExprWithTySig _ expr typ) =
+  let g :: LHsType (GhcPass (NoGhcTcPass (NoGhcTcPass n)))-> LHsType (GhcPass n)
+      g = unsafeCoerce
+    in AST.UTypeSig <$> trfExpr expr <*> trfType (g $ hsib_body $ hswc_body typ) --TODO:
 trfExpr' (ArithSeq _ _ (From from)) = AST.UEnum <$> trfExpr from <*> nothing "," "" (before AnnDotdot)
                                                                 <*> nothing "" "" (before AnnCloseS)
 trfExpr' (ArithSeq _ _ (FromThen from step))
@@ -170,10 +170,10 @@ trfExpr' (HsSpliceE _ splice) = AST.USplice <$> trfSplice splice
 trfExpr' (HsRnBracketOut _ br _) = AST.UBracketExpr <$> annContNoSema (trfBracket' br)
 trfExpr' (HsProc _ pat cmdTop) = AST.UProc <$> trfPattern pat <*> trfCmdTop cmdTop
 trfExpr' (HsStatic _ expr) = AST.UStaticPtr <$> trfExpr expr
--- trfExpr' (HsAppType _ expr typ) =
---     let g :: LHsType (GhcPass (NoGhcTcPass p)) -> LHsType (GhcPass p)
---         g = unsafeCoerce
---     in AST.UExplTypeApp <$> trfExpr expr <*> trfType (g $ hswc_body typ) --TODO:
+trfExpr' (HsAppType _ expr typ) =
+    let g :: LHsType (GhcPass (NoGhcTcPass n)) -> LHsType (GhcPass n)
+        g = unsafeCoerce
+    in AST.UExplTypeApp <$> trfExpr expr <*> trfType (g $ hswc_body typ) --TODO:
 trfExpr' (HsSCC _ _ lit expr) = AST.UExprPragma <$> pragma <*> trfExpr expr
   where pragma = do pragLoc <- tokensLoc [AnnOpen, AnnClose]
                     focusOn pragLoc $ annContNoSema (AST.USccPragma <$> annLocNoSema (mappend <$> tokenLoc AnnValStr <*> tokenLocBack AnnVal) (trfText' lit))

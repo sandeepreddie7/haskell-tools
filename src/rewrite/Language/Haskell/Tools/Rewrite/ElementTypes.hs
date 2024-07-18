@@ -204,6 +204,7 @@ type Match = Ann UMatch IdDom SrcTemplateStage
 
 -- | Something on the left side of the match
 type MatchLhs = Ann UMatchLhs IdDom SrcTemplateStage
+type MatchLhs' = Ann UMatchLhs (Dom GhcPs) SrcTemplateStage
 
 -- | Right hand side of a value binding (possible with guards): (@ = 3 @ or @ | x == 1 = 3; | otherwise = 4 @)
 type Rhs = Ann URhs IdDom SrcTemplateStage

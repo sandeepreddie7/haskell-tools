@@ -10,7 +10,7 @@ import Data.String (IsString(..))
 import Language.Haskell.Tools.AST
 import Language.Haskell.Tools.PrettyPrint.Prepare
 import Language.Haskell.Tools.Rewrite.Create.Patterns (mkVarPat)
-import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe, mkAnn', mkAnnMaybe')
+import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe, mkAnn', mkAnnMaybe', mkAnnList')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
 -- | A simplified function to generate simple value bindings without local definitions, guards or complex lhs.
@@ -41,6 +41,9 @@ mkMatch lhs rhs locs
 -- | Creates a match lhs with the function name and parameter names (@ f a b @)
 mkMatchLhs :: Name -> [Pattern] -> MatchLhs
 mkMatchLhs n pats = mkAnn (child <> child) $ UNormalLhs n (mkAnnList (after " " $ separatedBy " " list) pats)
+
+mkMatchLhs' :: Name' -> [Pattern'] -> MatchLhs'
+mkMatchLhs' n pats = mkAnn' (child <> child) $ UNormalLhs n (mkAnnList' (after " " $ separatedBy " " list) pats)
 
 -- | Creates an infix match lhs for an operator (@ a + b @)
 mkInfixLhs :: Pattern -> Operator -> Pattern -> [Pattern] -> MatchLhs

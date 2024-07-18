@@ -59,8 +59,7 @@ initGhcFlags' needsCodeGen errorsSuppressed = do
              , ghcMode = CompManager
              , packageFlags = ExposePackage "template-haskell" (PackageArg "template-haskell") (ModRenaming True []) : packageFlags dflags
              }) [
-                                BangPatterns
-                                ,BlockArguments
+                                BlockArguments
                                 ,ConstraintKinds
                                 ,DataKinds
                                 ,DeriveAnyClass
@@ -102,7 +101,19 @@ initGhcFlags' needsCodeGen errorsSuppressed = do
                                 ,TypeSynonymInstances
                                 ,UndecidableInstances
                                 ,ViewPatterns
-                                ,GHC.LanguageExtensions.UnicodeSyntax
+                                ,BangPatterns
+                                ,AllowAmbiguousTypes
+                                ,UnicodeSyntax
+                                ,StandaloneDeriving
+                                ,EmptyDataDecls
+                                ,FunctionalDependencies
+                                ,PartialTypeSignatures
+                                -- ,NamedFieldPuns
+                                -- ,NoImplicitPrelude
+                                ,Strict
+                                ,EmptyDataDeriving
+                                ,PolyKinds
+                                ,ExistentialQuantification 
                           ]
 
 initGhcFlagsForTest :: Ghc ()
@@ -124,10 +135,9 @@ foldLocs = foldl combineSrcSpans noSrcSpan
 
 moduleParser :: String -> String -> IO ((Ann AST.UModule (Dom GhcPs) SrcTemplateStage))
 moduleParser modulePath moduleName = do
-    print modulePath
     dflags <- runGhc (Just libdir) getSessionDynFlags
     pp <- getCurrentDirectory
-    modSum <- runGhc (Just libdir) $ loadModule (if "src-generated" `isInfixOf` modulePath then pp <> "euler-api-txns/euler-x/src-generated/" else if "src-extras" `isInfixOf` modulePath then pp <> "euler-api-txns/euler-x/src-extras/" else pp <> "euler-api-txns/euler-x/src/") moduleName
+    modSum <- runGhc (Just libdir) $ loadModule (modulePath) moduleName
     print $ showSDocUnsafe $ ppr modSum
     y <- runGhc (Just libdir) $ parseModule modSum
     let annots = pm_annotations y
