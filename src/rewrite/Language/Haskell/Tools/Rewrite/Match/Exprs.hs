@@ -13,6 +13,9 @@ import Language.Haskell.Tools.Rewrite.Match.Stmts
 pattern Var :: Name -> Expr
 pattern Var name <- Ann _ (UVar name)
 
+pattern Var' :: Name' -> Expr'
+pattern Var' name <- Ann _ (UVar name)
+
 -- | A literal expression (@ 42 @)
 pattern Lit :: Literal -> Expr
 pattern Lit lit <- Ann _ (ULit lit)
@@ -28,6 +31,9 @@ pattern PrefixApp op rhs <- Ann _ (UPrefixApp op rhs)
 -- | Function application (@ f 4 @)
 pattern App :: Expr -> Expr -> Expr
 pattern App f e <- Ann _ (UApp f e)
+
+pattern App' :: Expr' -> Expr' -> Expr'
+pattern App' f e <- Ann _ (UApp f e)
 
 -- | Lambda expression (@ \\a b -> a + b @)
 pattern Lambda :: PatternList -> Expr -> Expr

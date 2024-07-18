@@ -1,0 +1,69 @@
+name:                haskell-tools-parser
+version:             1.1.1.0
+synopsis:            Refactoring Tool for Haskell
+description:         Contains a set of refactorings based on the Haskell-Tools framework to easily transform a Haskell program. For the descriptions of the implemented refactorings, see the homepage.
+homepage:            https://github.com/haskell-tools/haskell-tools
+license:             
+author:              Chaitanya Nair
+maintainer:          chaitanyanair920@gmail.com
+category:            Language
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  ghc-options: -O2
+  exposed-modules:     Language.Haskell.Tools.Parser.ParseModule
+                     , Language.Haskell.Tools.Parser.SplitModule
+                     , Language.Haskell.Tools.Parser.ProgramOptions
+                     , Language.Haskell.Tools.Parser.LetRefactoring
+                     , Language.Haskell.Tools.Parser.RemoveWildCards
+                     , Language.Haskell.Tools.Parser.SplitTypesInModule
+                     , Language.Haskell.Tools.Parser.RemoveUnusedFuns
+                     , Language.Haskell.Tools.Parser.FlowChange
+
+  other-modules:       Language.Haskell.Tools.Parser.GetFunctionBranching
+
+  build-depends:       base                       
+                     , aeson                     
+                     , mtl                       >= 2.2  && < 2.3
+                     , uniplate                  >= 1.6  && < 1.7
+                     , ghc-paths                 >= 0.1  && < 0.2
+                     , containers                >= 0.5  && < 0.7
+                     , directory                 >= 1.2  && < 1.4
+                     , transformers              >= 0.5  && < 0.6
+                     , references                 
+                     , split                     >= 0.2  && < 0.3
+                     , filepath                  >= 1.4  && < 1.5
+                     , template-haskell           
+                     , ghc                        
+                     , Cabal                      
+                     , haskell-tools-ast         >= 1.1  && < 1.2
+                     , haskell-tools-backend-ghc
+                     , haskell-tools-rewrite     >= 1.1  && < 1.2
+                     , haskell-tools-prettyprint >= 1.1  && < 1.2
+                     , haskell-tools-refactor
+                     , haskell-tools-builtin-refactorings
+                     , strict
+                     , pretty
+                     , Diff
+                     , extra
+                     , unordered-containers
+                     , shelly
+                     , ghc-boot
+                     , optparse-applicative
+                     , pretty-simple
+                     , text
+  default-language:    Haskell2010
+
+executable ht-parse
+  ghc-options:         -rtsopts
+  build-depends:       base                       
+                     , split                     >= 0.2 && < 0.3
+                     , mtl                       >= 2.2 && < 2.3
+                     , directory                 >= 1.2  && < 1.4
+                     , filepath                  >= 1.4  && < 2.0 
+                     , optparse-applicative      
+                     , haskell-tools-parser
+  hs-source-dirs:      exe
+  main-is:             Main.hs
+  default-language:    Haskell2010

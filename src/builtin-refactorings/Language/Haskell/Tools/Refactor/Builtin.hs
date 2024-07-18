@@ -12,6 +12,10 @@ import Language.Haskell.Tools.Refactor.Builtin.OrganizeExtensions (organizeExten
 import Language.Haskell.Tools.Refactor.Builtin.OrganizeImports (organizeImportsRefactoring, projectOrganizeImportsRefactoring)
 import Language.Haskell.Tools.Refactor.Builtin.RenameDefinition (renameDefinitionRefactoring)
 import Language.Haskell.Tools.Refactor.Builtin.GetMatches (getMatchesQuery)
+import Language.Haskell.Tools.Refactor.Builtin.LetRefactoring (changeReturnToLetTypeRefactoring, projectChangePureToLetRefactoring)
+import Language.Haskell.Tools.Refactor.Builtin.ChangeMonad (changeMonadRefactoring)
+import Language.Haskell.Tools.Refactor.Builtin.WriteBack (writeBackRefactoring)
+import Language.Haskell.Tools.Refactor.Builtin.Ref1 (encodeDecodeTransformRef)
 import Language.Haskell.Tools.Refactor.Builtin.AutoCorrect
 
 builtinRefactorings :: [RefactoringChoice]
@@ -27,6 +31,11 @@ builtinRefactorings
     , organizeExtensionsRefactoring
     , projectOrganizeExtensionsRefactoring
     , autoCorrectRefactoring
+    , changeReturnToLetTypeRefactoring
+    , projectChangePureToLetRefactoring
+    , changeMonadRefactoring
+    , writeBackRefactoring
+    , encodeDecodeTransformRef
     ]
 
 builtinQueries :: [QueryChoice]

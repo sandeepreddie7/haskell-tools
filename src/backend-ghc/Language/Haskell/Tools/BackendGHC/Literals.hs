@@ -6,10 +6,11 @@ import qualified Data.ByteString.Char8 as BS (foldr)
 
 import BasicTypes as GHC (FractionalLit(..), IntegralLit(..))
 import FastString as GHC (unpackFS)
-import HsLit as GHC (OverLitVal(..), HsLit(..))
+import GHC.Hs.Lit as GHC (OverLitVal(..), HsLit(..))
 import Type as GHC
 import TysWiredIn as GHC
 import TysPrim as GHC
+import GHC.Hs.Extension
 
 import Language.Haskell.Tools.AST (Dom, RangeStage)
 import qualified Language.Haskell.Tools.AST as AST (ULiteral(..))
@@ -17,7 +18,7 @@ import Language.Haskell.Tools.BackendGHC.Monad (Trf)
 import Language.Haskell.Tools.BackendGHC.Utils
 import Language.Haskell.Tools.BackendGHC.Names
 
-trfLiteral' :: TransformName n r => HsLit n -> Trf (AST.ULiteral (Dom r) RangeStage)
+trfLiteral' :: TransformName n r => HsLit (GhcPass n) -> Trf (AST.ULiteral (Dom (GhcPass r)) RangeStage)
 trfLiteral' (HsChar _ ch) = pure $ AST.UCharLit ch
 trfLiteral' (HsCharPrim _ ch) = pure $ AST.UPrimCharLit ch
 trfLiteral' (HsString _ str) = pure $ AST.UStringLit (unpackFS str)

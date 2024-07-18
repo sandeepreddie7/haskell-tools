@@ -14,6 +14,9 @@ pattern SimpleBind p r l <- Ann _ (USimpleBind p r l)
 pattern FunctionBind :: MatchList -> ValueBind
 pattern FunctionBind matches <- Ann _ (UFunBind matches)
 
+pattern FunctionBind' :: MatchList' -> ValueBind'
+pattern FunctionBind' matches <- Ann _ (UFunBind matches)
+
 -- | Clause of function binding
 pattern Match :: MatchLhs -> Rhs -> MaybeLocalBinds -> Match
 pattern Match lhs rhs locs <- Ann _ (UMatch lhs rhs locs)

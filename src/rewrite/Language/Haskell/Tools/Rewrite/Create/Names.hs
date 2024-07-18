@@ -7,13 +7,16 @@ module Language.Haskell.Tools.Rewrite.Create.Names where
 import Data.String (IsString(..), String)
 import Language.Haskell.Tools.AST
 import Language.Haskell.Tools.PrettyPrint.Prepare
-import Language.Haskell.Tools.Rewrite.Create.Utils (emptyList, mkAnn, mkAnnList)
+import Language.Haskell.Tools.Rewrite.Create.Utils (emptyList, mkAnn, mkAnnList, mkAnn', emptyList')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 import qualified Name as GHC
 
 -- | Creates a simple, unqualified name
 mkName :: String -> Name
 mkName = mkNormalName . mkSimpleName
+
+mkName' :: String -> Name'
+mkName' = mkNormalName' . mkSimpleName''
 
 mkQualOp :: [String] -> String -> Operator
 mkQualOp quals = mkAnn child . UNormalOp . mkQualifiedName quals
@@ -34,6 +37,9 @@ mkUnqualOp' n | GHC.isSymOcc (GHC.getOccName n) = mkAnn child $ UNormalOp $ mkSi
 mkUnqualOp :: String -> Operator
 mkUnqualOp = mkAnn child . UNormalOp . mkSimpleName
 
+mkUnqualOpForGhcPs :: String -> Operator'
+mkUnqualOpForGhcPs = mkAnn' child . UNormalOp . mkSimpleName''
+
 -- | Creates an annotated qualified (non-operator) binding name: @A.B.f@ or @(A.B.+)@
 mkQualName' :: [String] -> GHC.Name -> Name
 mkQualName' quals n | GHC.isSymOcc (GHC.getOccName n) = mkAnn ("(" <> child <> ")") $ UParenName $ mkQualifiedName' quals n
@@ -46,6 +52,9 @@ mkUnqualName' n | GHC.isSymOcc (GHC.getOccName n) = mkAnn ("(" <> child <> ")") 
 
 mkNormalName :: QualifiedName -> Name
 mkNormalName = mkAnn child . UNormalName
+
+mkNormalName' :: QualifiedName' -> Name'
+mkNormalName' = mkAnn' child . UNormalName
 
 -- | Creates a parenthesized name: @ foldl (+) 0 @
 mkParenName :: QualifiedName -> Name
@@ -69,6 +78,9 @@ mkQualifiedName quals name
 mkNamePart :: String -> NamePart
 mkNamePart s = mkAnn (fromString s) (UNamePart s)
 
+mkNamePart' :: String -> NamePart'
+mkNamePart' s = mkAnn' (fromString s) (UNamePart s)
+
 -- | Creates a simple (unqualified) name
 mkSimpleName' :: GHC.Name -> QualifiedName
 mkSimpleName' = mkSimpleName . GHC.occNameString . GHC.getOccName
@@ -78,6 +90,13 @@ mkSimpleName :: String -> QualifiedName
 mkSimpleName n = mkAnn (child <> child) 
                        (UQualifiedName emptyList (mkNamePart n))
 
+mkSimpleName'' :: String -> QualifiedName'
+mkSimpleName'' n = mkAnn' (child <> child) 
+                       (UQualifiedName emptyList' (mkNamePart' n))
+
 -- | Creates a quoted text
 mkStringNode :: String -> StringNode
 mkStringNode s = mkAnn (fromString s) (UStringNode s)
+
+mkStringNode' :: String -> StringNode'
+mkStringNode' s = mkAnn' (fromString s) (UStringNode s)

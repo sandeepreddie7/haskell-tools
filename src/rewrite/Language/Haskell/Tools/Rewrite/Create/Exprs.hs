@@ -8,7 +8,7 @@ module Language.Haskell.Tools.Rewrite.Create.Exprs where
 
 import Language.Haskell.Tools.AST
 import Language.Haskell.Tools.PrettyPrint.Prepare
-import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe)
+import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnnMaybe, mkAnn', mkAnnList', mkAnnMaybe')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
 -- * Expressions
@@ -16,6 +16,9 @@ import Language.Haskell.Tools.Rewrite.ElementTypes
 -- | Create a expression for a variable or a data constructor (@ a @)
 mkVar :: Name -> Expr
 mkVar = mkAnn child . UVar
+
+mkVar' :: Name' -> Expr'
+mkVar' = mkAnn' child . UVar
 
 -- | Create a literal expression (@ 42 @)
 mkLit :: Literal -> Expr
@@ -25,6 +28,9 @@ mkLit = mkAnn child . ULit
 mkInfixApp :: Expr -> Operator -> Expr -> Expr
 mkInfixApp lhs op rhs = mkAnn (child <> " " <> child <> " " <> child) $ UInfixApp lhs op rhs
 
+mkInfixAppForGhcPs' :: Expr' -> Operator' -> Expr' -> Expr'
+mkInfixAppForGhcPs' lhs op rhs = mkAnn' (child <> " " <> child <> " " <> child) $ UInfixApp lhs op rhs
+
 -- | Create a prefix operator application expression (@ -x @)
 mkPrefixApp :: Operator -> Expr -> Expr
 mkPrefixApp op rhs = mkAnn (child <> child) $ UPrefixApp op rhs
@@ -32,6 +38,9 @@ mkPrefixApp op rhs = mkAnn (child <> child) $ UPrefixApp op rhs
 -- | Create a function application expression (@ f 4 @)
 mkApp :: Expr -> Expr -> Expr
 mkApp f e = mkAnn (child <> " " <> child) (UApp f e)
+
+mkAppForGhcPs :: Expr' -> Expr' -> Expr'
+mkAppForGhcPs f e = mkAnn' (child <> " " <> child) (UApp f e)
 
 -- | Create a lambda expression (@ \\a b -> a + b @)
 mkLambda :: [Pattern] -> Expr -> Expr
@@ -41,9 +50,15 @@ mkLambda pats rhs = mkAnn ("\\" <> child <> " -> " <> child) $ ULambda (mkAnnLis
 mkLet :: [LocalBind] -> Expr -> Expr
 mkLet pats expr = mkAnn ("let " <> child <> " in " <> child) $ ULet (mkAnnList (indented list) pats) expr
 
+mkLet' :: [LocalBind'] -> Expr' -> Expr'
+mkLet' pats expr = mkAnn' ("let " <> child <> " in " <> child) $ ULet (mkAnnList' (indented list) pats) expr
+
 -- | Create a if expression (@ if a then b else c @)
 mkIf :: Expr -> Expr -> Expr -> Expr
 mkIf cond then_ else_ = mkAnn ("if " <> child <> " then " <> child <> " else " <> child) $ UIf cond then_ else_
+
+mkIfForRanged :: Expr' -> Expr' -> Expr' -> Expr'
+mkIfForRanged cond then_ else_ = mkAnn' ("if " <> child <> " then " <> child <> " else " <> child) $ UIf cond then_ else_
 
 -- | Create a multi way if expressions with @MultiWayIf@ extension (@ if | guard1 -> expr1; guard2 -> expr2 @)
 mkMultiIf :: [GuardedCaseRhs] -> Expr
@@ -53,9 +68,14 @@ mkMultiIf cases = mkAnn ("if" <> child) $ UMultiIf (mkAnnList (indented list) ca
 mkCase :: Expr -> [Alt] -> Expr
 mkCase expr cases = mkAnn ("case " <> child <> " of " <> child) $ UCase expr (mkAnnList (indented list) cases)
 
+mkCaseForRanged :: Expr' -> [Alt'] -> Expr'
+mkCaseForRanged expr cases = mkAnn' ("case " <> child <> " of " <> child) $ UCase expr (mkAnnList' (indented list) cases)
 -- | Create a do-notation expressions (@ do x <- act1; act2 @)
 mkDoBlock :: [Stmt] -> Expr
 mkDoBlock stmts = mkAnn (child <> " " <> child) $ UDo (mkAnn "do" UDoKeyword) (mkAnnList (indented list) stmts)
+
+mkDoBlock' :: [Stmt'] -> Expr'
+mkDoBlock' stmts = mkAnn' (child <> " " <> child) $ UDo (mkAnn' "do" UDoKeyword) (mkAnnList' (indented list) stmts)
 
 -- | Create a mdo-notation expressions (@ mdo x <- act1; act2 @)
 mkMDoBlock :: [Stmt] -> Expr
@@ -93,6 +113,7 @@ mkParArray exprs = mkAnn ("[: " <> child <> " :]") $ UParArray (mkAnnList (separ
 -- | Create a parenthesized expression: @( a + b )@
 mkParen :: Expr -> Expr
 mkParen = mkAnn ("(" <> child <> ")") . UParen
+
 
 -- | Create a left operator section: @(1+)@
 mkLeftSection :: Expr -> Operator -> Expr
@@ -203,9 +224,15 @@ mkFieldWildcard = mkAnn child $ UFieldWildcard $ mkAnn ".." FldWildcard
 mkAlt :: Pattern -> CaseRhs -> Maybe LocalBinds -> Alt
 mkAlt pat rhs locals = mkAnn (child <> child <> child) $ UAlt pat rhs (mkAnnMaybe (after " where " opt) locals)
 
+mkAltForRanged :: Pattern' -> CaseRhs' -> Maybe LocalBinds' -> Alt'
+mkAltForRanged pat rhs locals = mkAnn' (child <> child <> child) $ UAlt pat rhs (mkAnnMaybe' (after " where " opt) locals)
+
 -- | Create a unguarded right-hand side a pattern match (@ -> 3 @)
 mkCaseRhs :: Expr -> CaseRhs
 mkCaseRhs = mkAnn (" -> " <> child) . UUnguardedCaseRhs
+
+mkCaseRhsForRanged :: Expr' -> CaseRhs'
+mkCaseRhsForRanged = mkAnn' (" -> " <> child) . UUnguardedCaseRhs
 
 -- | Create a guarded right-hand sides of a pattern match (@ | x == 1 -> 3; | otherwise -> 4 @)
 mkGuardedCaseRhss :: [GuardedCaseRhs] -> CaseRhs

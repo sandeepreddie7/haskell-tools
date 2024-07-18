@@ -16,16 +16,16 @@ extra-source-files: examples/example-project/*.hs
                   , examples/CppHs/Language/Preprocessor/Cpphs/*.hs
 
 library
-  build-depends:       base                      >= 4.11 && < 4.13
+  build-depends:       base                       
                      , containers                >= 0.5 && < 0.7
                      , mtl                       >= 2.2 && < 2.3
                      , split                     >= 0.2 && < 0.3
                      , directory                 >= 1.2 && < 1.4
                      , filepath                  >= 1.4 && < 2
-                     , ghc                       >= 8.4 && < 8.7
+                     , ghc                       
                      , ghc-paths                 >= 0.1 && < 0.2
                      , references                >= 0.3 && < 0.4
-                     , strict                    >= 0.3 && < 0.4
+                     , strict                    
                      , haskell-tools-refactor    >= 1.1 && < 1.2
                      , haskell-tools-builtin-refactorings >= 1.1 && < 1.2
                      , haskell-tools-daemon      >= 1.1 && < 1.2
@@ -36,12 +36,12 @@ library
 
 executable ht-refact
   ghc-options:         -rtsopts
-  build-depends:       base                      >= 4.11 && < 4.13
+  build-depends:       base                       
                      , split                     >= 0.2 && < 0.3
                      , mtl                       >= 2.2 && < 2.3
                      , directory                 >= 1.2  && < 1.4
                      , filepath                  >= 1.4  && < 2.0
-                     , optparse-applicative      >= 0.14 && < 0.15
+                     , optparse-applicative      
                      , haskell-tools-cli
                      , haskell-tools-daemon      >= 1.1 && < 1.2
                      , haskell-tools-builtin-refactorings >= 1.1 && < 1.2
@@ -54,8 +54,8 @@ test-suite haskell-tools-cli-tests
   ghc-options:         -with-rtsopts=-M2g
   hs-source-dirs:      test
   main-is:             Main.hs
-  build-depends:       base                      >= 4.11 && < 4.13
-                     , tasty                     >= 0.11 && < 1.2
+  build-depends:       base                       
+                     , tasty                     
                      , tasty-hunit               >= 0.9 && < 0.11
                      , directory                 >= 1.2 && < 1.4
                      , filepath                  >= 1.4 && < 2.0
@@ -66,12 +66,12 @@ test-suite haskell-tools-cli-tests
   default-language:    Haskell2010
 
 executable ht-test-stackage
-  build-depends:       base                      >= 4.11 && < 4.13
+  build-depends:       base                       
                      , directory                 >= 1.2 && < 1.4
                      , process                   >= 1.6 && < 1.7
                      , split                     >= 0.2 && < 0.3
                      , filepath                  >= 1.4 && < 2.0
-                     , optparse-applicative      >= 0.14 && < 0.15
+                     , optparse-applicative      
                      , Glob                      >= 0.9 && < 0.10
   ghc-options:         -threaded
   hs-source-dirs:      test-stackage
@@ -81,10 +81,10 @@ executable ht-test-stackage
 benchmark cli-benchmark
   type:                exitcode-stdio-1.0
   ghc-options:         -with-rtsopts=-M2g
-  build-depends:       base                      >= 4.11 && < 4.13
+  build-depends:       base                       
                      , criterion                 >= 1.1 && < 1.6
                      , time                      >= 1.6 && < 1.9
-                     , aeson                     >= 1.0 && < 1.5
+                     , aeson                     
                      , directory                 >= 1.2 && < 1.4
                      , filepath                  >= 1.4 && < 2.0
                      , knob                      >= 0.1 && < 0.2

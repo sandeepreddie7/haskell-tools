@@ -23,7 +23,7 @@ import Language.Haskell.Tools.Daemon.ErrorHandling (userExceptionHandlers, excep
 import Language.Haskell.Tools.Daemon.Mode (WorkingMode(..), socketMode)
 import Language.Haskell.Tools.Daemon.Options as Options (SharedDaemonOptions(..), DaemonOptions(..))
 import Language.Haskell.Tools.Daemon.Protocol
-import Language.Haskell.Tools.Daemon.State (DaemonSessionState(..), initSession, exiting)
+import Language.Haskell.Tools.Daemon.State (DaemonSessionState(..), initSession)
 import Language.Haskell.Tools.Daemon.Update (updateClient, initGhcSession)
 import Language.Haskell.Tools.Daemon.Watch (createWatchProcess', stopWatch)
 import Language.Haskell.Tools.Refactor (RefactoringChoice(..), QueryChoice(..))
@@ -80,7 +80,7 @@ serverLoop refactorings queries mode conn options ghcSess state warnMVar =
   do msgs <- daemonReceive mode conn
      continue <- mapM respondToMsg msgs
      sessionData <- readMVar state
-     when (not (sessionData ^. exiting) && all (== True) continue)
+     when (not (_exiting sessionData) && all (== True) continue)
        $ serverLoop refactorings queries mode conn options ghcSess state warnMVar
    `catches` exceptionHandlers (serverLoop refactorings queries mode conn options ghcSess state warnMVar)
                                (daemonSend mode conn . ErrorMessage)

@@ -17,7 +17,7 @@ import DynFlags (xopt)
 import FastString (unpackFS, mkFastString)
 import FieldLabel as GHC (FieldLbl(..))
 import GHC
-import HsSyn
+import GHC.Hs.ImpExp
 import HscTypes
 import Language.Haskell.TH.LanguageExtensions (Extension(..))
 import Module as GHC
@@ -56,6 +56,10 @@ createModuleInfo mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) =
   return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True)
                         (forceElements preludeImports) deps
 
+createModuleInfo' :: ModSummary -> SrcSpan -> [LImportDecl n] -> Trf (Sema.ModuleInfo GhcRn)
+createModuleInfo' mod nameLoc (filter (not . ideclImplicit . unLoc) -> imports) = do
+  return $ mkModuleInfo (ms_mod mod) (ms_hspp_opts mod) (case ms_hsc_src mod of HsSrcFile -> False; _ -> True) [] []
+
 -- | Creates a semantic information for a name
 createNameInfo :: IdP n -> Trf (NameInfo n)
 createNameInfo name = do locals <- asks localsInScope
@@ -76,14 +80,14 @@ createImplicitNameInfo name = do locals <- asks localsInScope
                                  return (mkImplicitNameInfo locals isDefining name rng)
 
 -- | Creates a semantic information for an implicit name
-createImplicitFldInfo :: (GHCName n, HsHasName (IdP n)) => (a -> IdP n) -> [HsRecField n a] -> Trf ImplicitFieldInfo
+createImplicitFldInfo :: (GHCName n, HsHasName (IdP (GhcPass n))) => (a -> IdP (GhcPass n)) -> [HsRecField (GhcPass n) a] -> Trf ImplicitFieldInfo
 createImplicitFldInfo select flds = return (mkImplicitFieldInfo (map getLabelAndExpr flds))
   where getLabelAndExpr fld = ( getTheName $ unLoc (getFieldOccName (hsRecFieldLbl fld))
                               , getTheName $ select (hsRecFieldArg fld) )
         getTheName = (\case e:_ -> e; [] -> convProblem "createImplicitFldInfo: missing names") . hsGetNames'
 
 -- | Adds semantic information to an impord declaration. See ImportInfo.
-createImportData :: forall r n . (GHCName r, HsHasName (IdP n)) => GHC.ImportDecl n -> Trf (ImportInfo r)
+createImportData :: forall r n . (GHCName r, HsHasName (IdP (GhcPass n))) => GHC.ImportDecl (GhcPass n) -> Trf (ImportInfo (GhcPass r))
 createImportData (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
   do (mod,importedNames) <- getImportedNames (GHC.moduleNameString $ unLoc name) (fmap (unpackFS . sl_fs) pkg)
      names <- liftGhc $ filterM (checkImportVisible declHiding . (^. pName)) importedNames
@@ -96,16 +100,24 @@ createImportData (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
      return $ mkImportInfo mod (forceElements $ catMaybes lookedUpImported)
                                (forceElements $ catMaybes lookedUpNames)
                                deps
-  where translatePName :: PName GhcRn -> Ghc (Maybe (PName r))
+  where translatePName :: PName GhcRn -> Ghc (Maybe (PName (GhcPass r)))
         translatePName (PName n p) = do n' <- (getFromNameUsing @r) getTopLevelId n
                                         p' <- maybe (return Nothing) ((getFromNameUsing @r) getTopLevelId) p
                                         return (PName <$> n' <*> Just p')
+
+-- | Adds semantic information to an impord declaration. See ImportInfo.
+createImportData' :: forall r n . (GHCName r, HsHasName (IdP (GhcPass n))) => GHC.ImportDecl (GhcPass n) -> Trf (ImportInfo (GhcPass r))
+createImportData' (GHC.ImportDecl _ _ name pkg _ _ _ _ _ declHiding) =
+  do (mod,importedNames) <- getImportedNames' (GHC.moduleNameString $ unLoc name) (fmap (unpackFS . sl_fs) pkg)
+     return $ mkImportInfo mod []
+                               []
+                               []
 
 getDeps :: Module -> Ghc [Module]
 getDeps mod = do
   env <- GHC.getSession
   eps <- liftIO $ hscEPS env
-  case lookupIfaceByModule (hsc_dflags env) (hsc_HPT env) (eps_PIT eps) mod of
+  case lookupIfaceByModule (hsc_HPT env) (eps_PIT eps) mod of
     Just ifc -> (mod :) <$> mapM (liftIO . getModule env . fst) (dep_mods (mi_deps ifc))
     Nothing -> return [mod]
   where getModule env modName = do
@@ -117,6 +129,19 @@ getDeps mod = do
                              _ -> error $ "getDeps: module not found: " ++ GHC.moduleNameString modName
 
 -- | Get names that are imported from a given import
+getImportedNames' :: String -> Maybe String -> Trf (GHC.Module, [PName GhcRn])
+getImportedNames' name pkg = liftGhc $ do
+  hpt <- hsc_HPT <$> getSession
+  eps <- getSession >>= liftIO . readIORef . hsc_EPS
+  mod <- pure $ GHC.Module (stringToUnitId "") (mkModuleName "") -- findModule (mkModuleName name) (fmap mkFastString pkg)
+  -- load exported names from interface file
+  let ifaceNames = maybe [] mi_exports $ flip lookupModuleEnv mod
+                                       $ eps_PIT eps
+  let homeExports = maybe [] (md_exports . hm_details) (lookupHptByModule hpt mod)
+  -- TODO: Why selectors are added in one case and not added in the other?
+  return (mod, concatMap (availToPName availNames) ifaceNames ++ concatMap (availToPName availNamesWithSelectors) homeExports)
+    where availToPName f a = map (\n -> if n == availName a then PName n Nothing else PName n (Just (availName a))) (f a)
+
 getImportedNames :: String -> Maybe String -> Trf (GHC.Module, [PName GhcRn])
 getImportedNames name pkg = liftGhc $ do
   hpt <- hsc_HPT <$> getSession
@@ -131,8 +156,8 @@ getImportedNames name pkg = liftGhc $ do
     where availToPName f a = map (\n -> if n == availName a then PName n Nothing else PName n (Just (availName a))) (f a)
 
 -- | Check is a given name is imported from an import with given import specification.
-checkImportVisible :: (HsHasName (IdP name), GhcMonad m)
-                   => Maybe (Bool, Located [LIE name]) -> GHC.Name -> m Bool
+checkImportVisible :: (HsHasName (IdP (GhcPass name)), GhcMonad m)
+                   => Maybe (Bool, Located [LIE (GhcPass name)]) -> GHC.Name -> m Bool
 checkImportVisible (Just (isHiding, specs)) name
   | isHiding  = not . or @[] <$> mapM (`ieSpecMatches` name) (map unLoc (unLoc specs))
   | otherwise = or @[] <$> mapM (`ieSpecMatches` name) (map unLoc (unLoc specs))
@@ -144,14 +169,14 @@ forceElements [] = []
 forceElements (a : ls) = let res = forceElements ls
                           in a `seq` res `seq` (a : ls)
 
-ieSpecMatches :: (HsHasName (IdP name), GhcMonad m) => IE name -> GHC.Name -> m Bool
-ieSpecMatches (concatMap hsGetNames' . HsSyn.ieNames -> ls) name
+ieSpecMatches :: (HsHasName (IdP (GhcPass name)), GhcMonad m) => IE (GhcPass name) -> GHC.Name -> m Bool
+ieSpecMatches (concatMap hsGetNames' . GHC.Hs.ImpExp.ieNames -> ls) name
   | name `elem` ls = return True
 -- ieNames does not consider field names
 ieSpecMatches (IEThingWith _ thing _ with flds) name
   | name `elem` concatMap hsGetNames' (map (ieWrappedName . unLoc) (thing : with) ++ map (flSelector . unLoc) flds)
   = return True
-ieSpecMatches ie@(IEThingAll {}) name | [n] <- hsGetNames' (HsSyn.ieName ie), isTyConName n
+ieSpecMatches ie@(IEThingAll {}) name | [n] <- hsGetNames' (GHC.Hs.ImpExp.ieName ie), isTyConName n
   = do entity <- lookupName n
        return $ case entity of Just (ATyCon tc)
                                  | Just cls <- tyConClass_maybe tc
@@ -170,6 +195,9 @@ nothing bef aft pos = annNothing . noSemaInfo . OptionalPos bef aft <$> pos
 
 emptyList :: String -> Trf SrcLoc -> Trf (AnnListG e (Dom n) RangeStage)
 emptyList sep ann = AnnListG <$> (noSemaInfo . ListPos "" "" sep Nothing <$> ann) <*> pure []
+
+emptyList' :: String -> Trf SrcLoc -> Trf (AnnListG e (Dom GhcPs) RangeStage)
+emptyList' sep ann = AnnListG <$> (noSemaInfo . ListPos "" "" sep Nothing <$> ann) <*> pure []
 
 -- | Creates a place for a list of nodes with a default place if the list is empty.
 makeList :: String -> Trf SrcLoc -> Trf [Ann e (Dom n) RangeStage] -> Trf (AnnListG e (Dom n) RangeStage)
@@ -223,7 +251,7 @@ elementsWithoutSemi (fst:rest) = indentedElements' (srcSpanEnd $ getRange fst) r
 trfLoc :: (a -> Trf (b (Dom n) RangeStage)) -> Trf (SemanticInfo (Dom n) b) -> Located a -> Trf (Ann b (Dom n) RangeStage)
 trfLoc f sema = trfLocCorrect sema pure f
 
-trfLocNoSema :: SemanticInfo (Dom n) b ~ NoSemanticInfo => (a -> Trf (b (Dom n) RangeStage)) -> Located a -> Trf (Ann b (Dom n) RangeStage)
+trfLocNoSema :: SemanticInfo (Dom (GhcPass n)) b ~ NoSemanticInfo => (a -> Trf (b (Dom (GhcPass n)) RangeStage)) -> Located a -> Trf (Ann b (Dom (GhcPass n)) RangeStage)
 trfLocNoSema f = trfLoc f (pure mkNoSemanticInfo)
 
 -- | Transforms a possibly-missing node with the default location of the end of the focus.

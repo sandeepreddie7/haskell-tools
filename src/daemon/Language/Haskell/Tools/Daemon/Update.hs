@@ -3,7 +3,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, BlockArguments #-}
 
 -- | Resolves how the daemon should react to individual requests from the client.
 module Language.Haskell.Tools.Daemon.Update (updateClient, updateForFileChanges, initGhcSession) where
@@ -13,14 +13,14 @@ import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Reference hiding (modifyMVarMasked_)
-import Data.Algorithm.Diff (Diff(..), getGroupedDiff)
+import Data.Algorithm.Diff
 import Data.Algorithm.DiffContext (prettyContextDiff, getContextDiff)
 import qualified Data.ByteString.Char8 as StrictBS (unpack, readFile)
 import Data.Either (Either(..), either, rights)
 import Control.Concurrent.MVar
 import Data.IORef (readIORef, newIORef)
 import Data.List as List hiding (insert)
-import qualified Data.Map as Map (insert, keys, filter)
+import qualified Data.Map as Map (insert, keys, filter, assocs)
 import Data.Maybe
 import qualified Data.Set as Set (fromList, isSubsetOf, (\\))
 import Data.Version (Version(..))
@@ -70,7 +70,7 @@ updateClient options warnMVar refactors queries resp
 updateClient' :: UpdateCtx -> ClientMessage -> DaemonSession Bool
 -- resets the internal state of Haskell-tools (but keeps options)
 updateClient' UpdateCtx{..} Reset
-  = do roots <- gets (^? refSessMCs & traversal & mcRoot)
+  = do roots <- gets (\st -> map (\x -> _mcRoot x) (_refSessMCs st))
        modify' $ resetSession
        Session sess <- liftIO $ reinitGhcSession warnMVar (generateCode (sharedOptions options))
        env <- liftIO $ readIORef sess
@@ -94,9 +94,9 @@ updateClient' UpdateCtx{..} Disconnect
        return False
 
 updateClient' UpdateCtx{..} (SetPackageDB pkgDB)
-  = do mcs <- gets (^. refSessMCs)
+  = do mcs <- gets (_refSessMCs)
        if null mcs
-         then modify' (packageDB .= Just (pkgDB, True))
+         then modify' (\st -> st{_packageDB = Just (pkgDB, True)})
          else liftIO $ response $ ErrorMessage "The package database is already in use and cannot be changed."
        return True
 
@@ -111,31 +111,31 @@ updateClient' _ (SetWorkingDir fp)
 updateClient' UpdateCtx{..} (SetGHCFlags flags)
   = do (unused, change) <- lift (useFlags flags)
        when (not $ null unused) $ liftIO $ response $ UnusedFlags unused
-       modify' $ ghcFlagsSet .= change
+       modify' (\st -> st{_ghcFlagsSet = change})
        return True
 
 updateClient' UpdateCtx{..} (RemovePackages packagePathes) = do
-    mcs <- gets (^. refSessMCs)
-    let existingFiles = concatMap @[] (map (^. sfkFileName) . Map.keys) (mcs ^? traversal & filtered isRemoved & mcModules)
+    mcs <- gets (_refSessMCs)
+    let existingFiles = concatMap @[] (map (_sfkFileName) . Map.keys) (map (\x -> _mcModules x) $ (filter (\x -> isRemoved x) mcs))
     lift $ forM_ existingFiles (\fs -> removeTarget (TargetFile fs Nothing))
-    lift $ deregisterDirs (mcs ^? traversal & filtered isRemoved & mcSourceDirs & traversal)
-    modify' $ refSessMCs .- filter (not . isRemoved)
+    lift $ deregisterDirs (concat $ map (\x -> _mcSourceDirs x) $ filter (isRemoved) mcs)
+    modify' (\st -> st{_refSessMCs = filter (not . isRemoved) (_refSessMCs st)})
     modifySession (\s -> s { hsc_mod_graph = mkModuleGraph $ filter ((`notElem` existingFiles) . getModSumOrig) (mgModSummaries $ hsc_mod_graph s) })
-    mcs <- gets (^. refSessMCs)
-    when (null mcs) $ modify' (packageDB .= Nothing)
+    mcs <- gets (_refSessMCs)
+    when (null mcs) $ modify' (\st -> st{_packageDB = Nothing})
     return True
-  where isRemoved mc = (mc ^. mcRoot) `elem` packagePathes
+  where isRemoved mc = (_mcRoot mc) `elem` packagePathes
 
 updateClient' UpdateCtx{..} UndoLast | disableHistory $ sharedOptions options
   = do liftIO $ response $ ErrorMessage "Recording history has been disabled from command line."
        return True
 updateClient' UpdateCtx{..} UndoLast =
-  do undos <- gets (^. undoStack)
+  do undos <- gets (_undoStack)
      case undos of
        [] -> do liftIO $ response $ ErrorMessage "There is nothing to undo. Please note that the refactoring history is cleared after manual changes in the refactored files."
                 return True
        lastUndo:_ -> do
-         modify (undoStack .- tail)
+         modify (\st -> st{_undoStack = tail (_undoStack st)})
          liftIO $ mapM_ performUndo lastUndo
          reloadModules response warnMVar (getUndoAdded lastUndo)
                                          (getUndoChanged lastUndo)
@@ -147,7 +147,7 @@ updateClient' UpdateCtx{..} (ReLoad added changed removed)
        return True
 
 updateClient' _ Stop
-  = do modify (exiting .= True)
+  = do modify (\st -> st{_exiting = True})
        return False
 
 updateClient' UpdateCtx{..} (PerformQuery query modPath selection args shutdown)
@@ -160,7 +160,9 @@ updateClient' UpdateCtx{..} (PerformQuery query modPath selection args shutdown)
        return (not shutdown)
 
 updateClient' UpdateCtx{..} (PerformRefactoring refact modPath selection args shutdown diffMode)
-  = do (selectedMod, otherMods) <- getFileMods modPath
+  = do liftIO $ print $ "inside perform refactoring: " ++ modPath
+       (selectedMod, otherMods) <- getFileMods modPath
+       liftIO $ print "inside perform refactoring"
        performRefactoring (refact:selection:args)
                           (maybe (Left modPath) Right selectedMod) otherMods
        when shutdown $ liftIO $ response Disconnected
@@ -172,28 +174,28 @@ updateClient' UpdateCtx{..} (PerformRefactoring refact modPath selection args sh
             Right diff -> do changedMods <- applyChanges diff
                              if not diffMode
                                then when (not (disableHistory $ sharedOptions options)) $ updateHistory changedMods
-                               else liftIO $ response $ DiffInfo (concatMap (either snd (^. _4)) changedMods)
-                             isWatching <- gets (isJust . (^. watchProc))
+                               else liftIO $ response $ DiffInfo (concatMap (\x -> either snd (^. _4) x) changedMods)
+                             isWatching <- gets (isJust . (_watchProc))
                              if not isWatching && not shutdown && not diffMode
                               -- if watch is on, then it will automatically
                               -- reload changed files, otherwise we do it manually
-                               then do reloadChanges (map ((^. sfkFileName) . (^. _1)) (rights changedMods))
+                               then do reloadChanges (map ((_sfkFileName) . (^. _1)) (rights changedMods))
                                        reportWarnings response warnMVar
-                               else modify (touchedFiles .= Set.fromList (map ((^. sfkFileName) . (^. _1)) (rights changedMods)))
+                               else modify (\st -> st{_touchedFiles = Set.fromList (map ((_sfkFileName) . (^. _1)) (rights changedMods))})
 
         applyChanges changes = do
           forM changes $ \case
             ModuleCreated n m otherM -> do
-              mcs <- gets (^. refSessMCs)
-              otherMR <- gets (lookupModInSCs otherM . (^. refSessMCs))
-              let Just otherMS = otherMR ^? just & _2 & modRecMS
+              mcs <- gets (_refSessMCs)
+              otherMR <- gets (lookupModInSCs otherM . (_refSessMCs))
+              let Just otherMS = _modRecMS <$> (otherMR ^? just & _2 )
                   Just mc = lookupModuleColl (otherM ^. sfkModuleName) mcs
               otherSrcDir <- liftIO $ getSourceDir otherMS
               let loc = toFileName otherSrcDir n
               let newCont = prettyPrint m
               when (not diffMode) $ do
-                modify' $ refSessMCs & traversal & filtered (\mc' -> (mc' ^. mcId) == (mc ^. mcId)) & mcModules
-                            .- Map.insert (SourceFileKey loc n) (ModuleNotLoaded NoCodeGen False)
+                modify' (\st -> st{_refSessMCs = map (\x -> x{_mcModules = Map.insert (SourceFileKey loc n) (ModuleNotLoaded NoCodeGen False) $ _mcModules x})
+                                                      $ filter (\mc' -> (_mcId mc') == (_mcId mc)) (_refSessMCs st)})
                 liftIO $ withBinaryFile loc WriteMode $ \handle -> do
                   hSetEncoding handle utf8
                   hPutStr handle newCont
@@ -215,12 +217,12 @@ updateClient' UpdateCtx{..} (PerformRefactoring refact modPath selection args sh
                  hFlush handle
               return $ Right (n, file, UndoChanges file undo, unifiedDiff)
             ModuleRemoved mod -> do
-              sfk <- gets (lookupModuleInSCs mod . (^. refSessMCs))
+              sfk <- gets (lookupModuleInSCs mod . (_refSessMCs))
               let Just file = sfk ^? just & _1 & sfkFileName
               origCont <- liftIO (StrictBS.unpack <$> StrictBS.readFile file)
               when (not diffMode) $ do
                 lift $ removeTarget (TargetFile file Nothing)
-                modify' $ (refSessMCs .- removeModule mod)
+                modify' $ (\st -> st{_refSessMCs = removeModule mod $ _refSessMCs st})
                 liftIO $ removeFile file
               return $ Left (RestoreRemoved file origCont, createUnifiedDiff file origCont "")
 
@@ -231,10 +233,10 @@ updateClient' UpdateCtx{..} (PerformRefactoring refact modPath selection args sh
 
         updateHistory :: [Either (UndoRefactor, b) (SourceFileKey, FilePath, UndoRefactor, String)] -> DaemonSession ()
         updateHistory changedMods
-          = do modify (undoStack .- (map (either fst (^. _3)) changedMods :))
+          = do modify (\st -> st{_undoStack = (map (either fst (^. _3)) changedMods :) $ _undoStack st})
                -- force the evaluation of the undo stack to prevent older versions of
                -- modules seeming to be used when they could be garbage collected
-               us <- gets (^. undoStack)
+               us <- gets (_undoStack)
                liftIO $ evaluate $ force us
                return ()
 
@@ -249,12 +251,11 @@ addPackages resp warnMVar packagePathes = do
     else do
       forM_ roots watchNew -- put a file system watch on each package
       -- clear existing removed packages
-      existingMCs <- gets (^. refSessMCs)
-      let existing = (existingMCs ^? traversal & filtered (isTheAdded roots) & mcModules & traversal & modRecMS)
+      let existing = (map (\(j,y) -> _modRecMS y) $ concatMap @[] Map.assocs $ _mcModules <$> (filter (isTheAdded roots) _refSessMCs))
           existingModNames = map ms_mod existing
       needToReload <- (filter (\ms -> not $ ms_mod ms `elem` existingModNames))
                         <$> getReachableModules (\_ -> return ()) (\ms -> ms_mod ms `elem` existingModNames)
-      modify' $ refSessMCs .- filter (not . isTheAdded roots) -- remove the added package from the database
+      modify' (\st -> st{_refSessMCs = filter (\x -> not $ isTheAdded roots x) (_refSessMCs)})-- remove the added package from the database
       forM_ existing $ \ms -> removeTarget (TargetFile (getModSumOrig ms) Nothing)
       modifySession (\s -> s { hsc_mod_graph = mkModuleGraph $ filter (not . (`elem` existingModNames) . ms_mod) (mgModSummaries $ hsc_mod_graph s) })
       -- load new modules
@@ -263,7 +264,7 @@ addPackages resp warnMVar packagePathes = do
         errs <- loadPackagesFrom
                   (\ms -> resp (LoadedModule (getModSumOrig ms) (getModSumName ms)))
                   (resp . LoadingModules . map getModSumOrig)
-                  (\st fp -> maybe (return []) (fmap maybeToList . detectAutogen fp . fst) (st ^. packageDB)) roots
+                  (\st fp -> maybe (return []) (fmap maybeToList . detectAutogen fp . fst) (_packageDB)) roots
         -- handle source errors here to prevent rollback on the tool state
         let errors = foldl mappend ([],[]) (map getProblems errs)
         if null (fst errors)
@@ -272,7 +273,7 @@ addPackages resp warnMVar packagePathes = do
           else liftIO $ resp $ uncurry CompilationProblem errors
       else liftIO $ resp $ ErrorMessage $ "Attempted to load two packages with different package DB. "
                                             ++ "Stack, cabal-sandbox and normal packages cannot be combined"
-  where isTheAdded roots mc = (mc ^. mcRoot) `elem` roots
+  where isTheAdded roots mc = (_mcRoot mc) `elem` roots
         initializePackageDBIfNeeded roots = do
           db <- dbSetup roots
           case db of
@@ -280,12 +281,12 @@ addPackages resp warnMVar packagePathes = do
             Just (pkgDB, _) -> do
               locs <- liftIO $ packageDBLoc pkgDB (head roots)
               usePackageDB locs
-              modify' (packageDBLocs .= locs)
+              modify' (\st -> st{_packageDBLocs = locs})
               return True
         dbSetup roots = do
-          pkgDB <- gets (^. packageDB)
+          pkgDB <- gets (_packageDB)
           case pkgDB of Nothing          -> do db <- liftIO $ decidePkgDB roots
-                                               modify (packageDB .= fmap (, False) db)
+                                               modify (\st -> st{_packageDB = fmap (, False) db})
                                                return (fmap (, False) db)
                         Just (_, True)   -> return pkgDB
                         Just (db, False) -> do newDB <- liftIO $ decidePkgDB roots
@@ -296,16 +297,16 @@ addPackages resp warnMVar packagePathes = do
 updateForFileChanges :: (ResponseMsg -> IO ()) -> MVar [Marker] -> [FilePath] -> [FilePath] -> [FilePath] -> DaemonSession ()
 updateForFileChanges resp warnMVar added changed removed = do
   -- clear undo stack if the changes are from another application
-  refactoredFiles <- gets (^. touchedFiles)
+  refactoredFiles <- gets (_touchedFiles)
   let changeSet = Set.fromList (added ++ changed ++ removed)
   when (not $ changeSet `Set.isSubsetOf` refactoredFiles)
-    $ modify (undoStack .= []) -- clear the undo stack, if this changeset is not a result of a refactoring
+    $ modify (\st -> st{_undoStack = []}) -- clear the undo stack, if this changeset is not a result of a refactoring
   -- check for module collections that failed to load
-  mcs <- gets (^. refSessMCs)
-  let packagesNotLoaded = filter (not . (^. mcLoadDone)) mcs
-      tryLoadAgain = filter (\r -> List.any (r `isPrefixOf`) (added ++ changed ++ removed)) $ map (^. mcRoot) packagesNotLoaded
+  mcs <- gets (_refSessMCs)
+  let packagesNotLoaded = filter (not . (_mcLoadDone)) mcs
+      tryLoadAgain = filter (\r -> List.any (r `isPrefixOf`) (added ++ changed ++ removed)) $ map (_mcRoot) packagesNotLoaded
   -- check for changes in .cabal files
-  modify (touchedFiles .- (Set.\\ changeSet))
+  modify (\st -> st {_touchedFiles = (Set.\\ changeSet) $ _touchedFiles st})
   let changedPackages = map takeDirectory
                           $ filter (\fp -> takeExtension fp == ".cabal")
                           $ added ++ changed ++ removed
@@ -322,8 +323,7 @@ reloadModules _ _ [] [] [] = return ()
 reloadModules resp warnMVar added changed removed = do
   lift $ forM_ removed (\src -> removeTarget (TargetFile src Nothing))
   -- remove targets deleted
-  modify' $ refSessMCs & traversal & mcModules
-              .- Map.filter (\m -> maybe True ((`notElem` removed) . getModSumOrig) (m ^? modRecMS))
+  modify' (\st -> st{_refSessMCs = map (\x -> x{_mcModules = Map.filter (\m -> maybe True ((`notElem` removed) . getModSumOrig) (Just $ _modRecMS m)) (_mcModules x)}) $ _refSessMCs st})
   modifySession (\s -> s { hsc_mod_graph = mkModuleGraph $ filter (\mod -> getModSumOrig mod `notElem` removed) (mgModSummaries $ hsc_mod_graph s) })
   -- reload changed modules
   -- TODO: filter those that are in reloaded packages
@@ -331,9 +331,9 @@ reloadModules resp warnMVar added changed removed = do
                        (\mss -> resp (LoadingModules (map getModSumOrig mss)))
                        (\ms -> getModSumOrig ms `elem` changed)
   reportWarnings resp warnMVar
-  mcs <- gets (^. refSessMCs)
-  let mcsToReload = filter (\mc -> any ((mc ^. mcRoot) `isPrefixOf`) added && isNothing (moduleCollectionPkgId (mc ^. mcId))) mcs
-  addPackages resp warnMVar (map (^. mcRoot) mcsToReload) -- reload packages containing added modules
+  mcs <- gets (_refSessMCs)
+  let mcsToReload = filter (\mc -> any ((_mcRoot mc) `isPrefixOf`) added && isNothing (moduleCollectionPkgId (_mcId mc))) mcs
+  addPackages resp warnMVar (map (_mcRoot) mcsToReload) -- reload packages containing added modules
 
 reportWarnings :: (ResponseMsg -> IO ()) -> MVar [Marker] -> DaemonSession ()
 reportWarnings resp warnMVar = liftIO $ do
@@ -418,10 +418,11 @@ usePackageDB pkgDbLocs
        dfs' <- liftIO $ fmap fst $ initPackages
                  $ dfs { packageDBFlags = map (PackageDB . PkgConfFile) pkgDbLocs ++ packageDBFlags dfs
                        , pkgDatabase = Nothing
+                      --  , pluginModNames = pluginModNames dfs ++ [GHC.mkModuleName "RecordDotPreprocessor", GHC.mkModuleName "Data.Record.Anon.Plugin"]
                        }
        void $ setSessionDynFlags dfs'
 
 watchNew :: FilePath -> DaemonSession ()
 watchNew fp = do
-    wt <- gets (^. watchProc)
+    wt <- gets (_watchProc)
     maybe (return ()) (\w -> watch w fp) wt

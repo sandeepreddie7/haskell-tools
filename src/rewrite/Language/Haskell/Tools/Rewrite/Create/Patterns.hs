@@ -8,12 +8,15 @@ module Language.Haskell.Tools.Rewrite.Create.Patterns where
 
 import Language.Haskell.Tools.AST (UFieldWildcard(..), UPatternField(..), UPattern(..))
 import Language.Haskell.Tools.PrettyPrint.Prepare
-import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList)
+import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnn, mkAnnList, mkAnn')
 import Language.Haskell.Tools.Rewrite.ElementTypes
 
 -- | Pattern name binding
 mkVarPat :: Name -> Pattern
 mkVarPat = mkAnn child . UVarPat
+
+mkVarPat' :: Name' -> Pattern'
+mkVarPat' = mkAnn' child . UVarPat
 
 -- | Literal pattern
 mkLitPat :: Literal -> Pattern
@@ -54,6 +57,9 @@ mkRecPat name flds = mkAnn (child <> "{ " <> child <> " }") $ URecPat name (mkAn
 -- | As-pattern (explicit name binding) (@ ls\@(hd:_) @)
 mkAsPat :: Name -> Pattern -> Pattern
 mkAsPat name pat = mkAnn (child <> "@" <> child) $ UAsPat name pat
+
+mkAsPat' :: Name' -> Pattern' -> Pattern'
+mkAsPat' name pat = mkAnn' (child <> "@" <> child) $ UAsPat name pat
 
 -- | Wildcard pattern: (@ _ @)
 mkWildPat :: Pattern
