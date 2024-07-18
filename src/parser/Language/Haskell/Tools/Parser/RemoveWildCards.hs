@@ -16,6 +16,7 @@ import Control.Monad.Extra
 import qualified Data.HashMap.Strict as HM
 import Data.Char (toLower)
 import Data.List.Extra (replace)
+import Language.Haskell.Tools.Parser.RemoveUnusedFuns hiding (traverseOverUValBind)
 
 removeWildCards :: String -> String -> IO ()
 removeWildCards modulePath moduleName = do
@@ -122,3 +123,34 @@ modifyLets expr =
     in [mkLetStmt' $ (ex ++ (concat otherExpr))]
   where
     getLocalBinding (Ann _ (ULetStmt (AnnListG _ expr))) = expr
+
+findAndReplace :: HM.HashMap String [String] -> String -> String -> IO ()
+findAndReplace hm oldFilePath newFilePath = do
+    y <- mapM (\(key,value) -> parseAndGet key value oldFilePath newFilePath) (HM.toList hm)
+    print y
+
+parseAndGet :: String -> [String] -> String -> String -> IO String
+parseAndGet moduleName listOfFuns oldFilePath newFilePath = do
+    newAST <- moduleParser newFilePath moduleName
+    (AnnListG _ newDecls) <- newAST ^? modDecl
+    oldAST <- moduleParser oldFilePath moduleName
+    (AnnListG annot oldDecls) <- oldAST ^? modDecl
+    let allDecls = filter (\decl -> not $ checkDecl decl listOfFuns) oldDecls
+        newAddedDecls = allDecls ++ newDecls
+        modifiedAST = (.=) modDecl (AnnListG annot newAddedDecls) oldAST
+    writeFile (oldFilePath <> (replace "." "/" moduleName) <> ".hs" ) (prettyPrint modifiedAST)
+    pure ""
+    
+
+
+checkDecl :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> [String] -> Bool
+checkDecl expr@(Ann _ (UTypeSigDecl (Ann _ (UTypeSignature funName _)))) str = any (== (head $ map getFunctions' $ funName ^? biplateRef)) str
+checkDecl expr@(Ann _ (UValueBinding (FunctionBind' ex))) str =
+    let !funName = mapMaybe (getFunctionNameFromValBind) ((ex) ^? biplateRef)
+    in if null funName then False else any (== head funName) str
+checkDecl expr@(Ann _ (UValueBinding (Ann _ (USimpleBind pat _ _)))) str = 
+        let name = fromJust $ getPatternName' pat
+        in if null name then False else any (== head name) str
+checkDecl expr _ = False
+
+

@@ -11,6 +11,7 @@ type AnnMaybe node = AnnMaybeG node IdDom SrcTemplateStage
 -- | The representation of a haskell module, that is a separate compilation unit.
 -- It may or may not have a header.
 type Module = Ann UModule IdDom SrcTemplateStage
+type Module' = Ann UModule (Dom GhcPs) SrcTemplateStage
 
 -- | Module declaration with name and (optional) exports
 type ModuleHead = Ann UModuleHead IdDom SrcTemplateStage
@@ -39,6 +40,7 @@ type ModulePragma' = Ann UModulePragma (Dom GhcPs) SrcTemplateStage
 
 -- | Pragmas that must be used before defining the module
 type FilePragma = Ann UFilePragma IdDom SrcTemplateStage
+type FilePragma' = Ann UFilePragma (Dom GhcPs) SrcTemplateStage
 
 -- | An import declaration: @import Module.Name@
 type ImportDecl = Ann UImportDecl IdDom SrcTemplateStage
@@ -108,12 +110,14 @@ type FunDep = Ann UFunDep IdDom SrcTemplateStage
 
 -- | A constructor declaration for a datatype
 type ConDecl = Ann UConDecl IdDom SrcTemplateStage
+type ConDecl' = Ann UConDecl (Dom GhcPs) SrcTemplateStage
 
 -- | The @data@ or the @newtype@ keyword to define ADTs.
 type DataOrNewtypeKeyword = Ann UDataOrNewtypeKeyword IdDom SrcTemplateStage
 
 -- | Field declaration (@ fld :: Int @)
 type FieldDecl = Ann UFieldDecl IdDom SrcTemplateStage
+type FieldDecl' = Ann UFieldDecl (Dom GhcPs) SrcTemplateStage
 
 -- | A deriving clause following a data type declaration. (@ deriving Show @ or @ deriving (Show, Eq) @)
 type Deriving = Ann UDeriving IdDom SrcTemplateStage
@@ -201,6 +205,7 @@ type ValueBind' = Ann UValueBind (Dom GhcPs) SrcTemplateStage
 
 -- | Clause of function binding
 type Match = Ann UMatch IdDom SrcTemplateStage
+type Match' = Ann UMatch (Dom GhcPs) SrcTemplateStage
 
 -- | Something on the left side of the match
 type MatchLhs = Ann UMatchLhs IdDom SrcTemplateStage
@@ -236,15 +241,20 @@ type TypeSignature = Ann UTypeSignature IdDom SrcTemplateStage
 
 -- | Haskell types
 type Type = Ann UType IdDom SrcTemplateStage
+type Type' = Ann UType (Dom GhcPs) SrcTemplateStage
+
 
 -- | Type variable declarations (with possible kind annotation)
 type TyVar = Ann UTyVar IdDom SrcTemplateStage
+type TyVar' = Ann UTyVar (Dom GhcPs) SrcTemplateStage
 
 -- One or more assertions
 type Context = Ann UContext IdDom SrcTemplateStage
+type Context' = Ann UContext (Dom GhcPs) SrcTemplateStage
 
 -- | A single assertion in the context
 type Assertion = Ann UAssertion IdDom SrcTemplateStage
+type Assertion' = Ann UAssertion (Dom GhcPs) SrcTemplateStage
 
 -- * Kinds
 
@@ -266,9 +276,11 @@ type Expr' = Ann UExpr (Dom GhcPs) SrcTemplateStage
 
 -- | Clause of case expression (@ Just x -> x + 1 @)
 type Alt = Ann UAlt IdDom SrcTemplateStage
+type Alt' = Ann UAlt (Dom GhcPs) SrcTemplateStage
 
 -- | Right hand side of a match (possible with guards): (@ -> 3 @ or @ | x == 1 -> 3; | otherwise -> 4 @)
 type CaseRhs = Ann UCaseRhs IdDom SrcTemplateStage
+type CaseRhs' = Ann UCaseRhs (Dom GhcPs) SrcTemplateStage
 
 -- | A guarded right-hand side of pattern matches binding (@ | x > 3 -> 2 @)
 type GuardedCaseRhs = Ann UGuardedCaseRhs IdDom SrcTemplateStage
@@ -339,6 +351,7 @@ type Literal = Ann ULiteral IdDom SrcTemplateStage
 
 -- | A definition that functions as an operator
 type Operator = Ann UOperator IdDom SrcTemplateStage
+type Operator' = Ann UOperator (Dom GhcPs) SrcTemplateStage
 
 -- | A definition that functions as a name
 type Name = Ann UName IdDom SrcTemplateStage
