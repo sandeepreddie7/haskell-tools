@@ -70,16 +70,17 @@ import System.IO.Unsafe
 import Language.Haskell.Tools.Refactor as HT
 import Language.Haskell.Tools.Rewrite.Create.Utils (mkAnnList')
 import Language.Haskell.Tools.AST.Representation.Binds (ULocalBind)
+import Language.Haskell.Tools.Parser.TraverseFunctionDef (getAllFunctions)
 -- import Language.Haskell.Tools.Parser.GetFunctionBranching (parseImportsAndGetModule)
 
 projectPath :: String
-projectPath = "/Users/sandeep.palla/Desktop/one-team-fixes/euler-api-txns"
+projectPath = "/Users/yashasvi.rana/Documents/juspay/euler-api-txns"
 
 getModulePath :: String
-getModulePath = "/Users/sandeep.palla/Desktop/one-team-fixes/euler-api-txns/euler-x/src-generated/"
+getModulePath = "/Users/yashasvi.rana/Documents/juspay/euler-api-txns/euler-x/src-generated/"
 
 getModuleName :: String
-getModuleName = "Gateway.PhonePe.Flow"
+getModuleName = "Gateway.Atom.Flow"
 
 type SyncFunctionName = String
 type SyncResponseSumType = String
@@ -88,13 +89,12 @@ type SyncErrorTypeToBeUsed = String
 data InputData = InputData
   { syncFunctionName  :: String
   , typeToBeUsedForOp :: String
-  }
+  } deriving (Show)
 
-getInputData :: [InputData]
-getInputData =
-  [ (InputData "phonepeTxnSync" "TransactionStatusResponse")
-  , (InputData "phonepeAuthSync" "TransactionStatusResponse")
-  ]
+-- getInputData :: [InputData]
+-- getInputData =
+--   [ (InputData "initEpayLaterTxnSync" "EpayLaterErrorResponse")
+--   ]
 
 exceptionFuncList :: [String]
 exceptionFuncList =
@@ -104,13 +104,16 @@ exceptionFuncList =
   , "throwErr"
   ]
 
-removeExceptions :: IO _
-removeExceptions =
-  mapM (replaceExceptions getModulePath getModuleName) getInputData
+removeExceptions :: String -> IO _
+removeExceptions functionName = do
+  moduleAST <- moduleParser getModulePath getModuleName
+  funcs <- getAllFunctions moduleAST functionName []
+  let inputData = map (\ funName -> InputData funName "Undefined") funcs
 
-replaceExceptions :: String -> String -> InputData -> IO _
-replaceExceptions modulePath moduleName inputData = do
-  moduleAST <- moduleParser modulePath moduleName
+  mapM (replaceExceptions moduleAST getModulePath getModuleName inputData) inputData
+
+replaceExceptions :: Ann UModule (Dom GhcPs) SrcTemplateStage -> String -> String -> [InputData] -> InputData -> IO _
+replaceExceptions moduleAST modulePath moduleName allInputData inputData = do
   (AST.AnnListG annot currentDecl) <- moduleAST ^? (modDecl)
   decls <-
     foldM
@@ -128,7 +131,7 @@ replaceExceptions modulePath moduleName inputData = do
   let nAST = (.=) modDecl (AST.AnnListG annot groupedDecls) moduleAST
   writeFile (modulePath <> (replace "." "/" moduleName) <> ".hs") (prettyPrint nAST)
 
-  if (syncFunctionName (head getInputData)) == (syncFunctionName inputData)
+  if (syncFunctionName (head allInputData)) == (syncFunctionName inputData)
     then do
       let syncDecl = head $ filter (\x -> getRequiredFun x (syncFunctionName inputData)) currentDecl
           syncSign = head $ filter (\x -> getRequiredFunSign x (syncFunctionName inputData)) currentDecl
@@ -167,7 +170,10 @@ replaceInValueBind :: Ann UValueBind (Dom GhcPs) SrcTemplateStage -> IO (Ann UVa
 replaceInValueBind (Ann a1 (UFunBind (AnnListG a2 matches))) = do
   updMatch <- mapM replaceInMatch matches
   pure $ Ann a1 $ UFunBind (AnnListG a2 updMatch)
-replaceInValueBind valueBind = pure valueBind
+replaceInValueBind (Ann a1 (USimpleBind pat rhs binds)) = do
+  updRhs <- replaceRhsExpr rhs
+  updBinds <- replaceWhereBinds binds
+  pure $ Ann a1 (USimpleBind pat updRhs updBinds)
 
 replaceInMatch :: Ann UMatch (Dom GhcPs) SrcTemplateStage -> IO (Ann UMatch (Dom GhcPs) SrcTemplateStage)
 replaceInMatch (Ann a1 (UMatch lhs rhs binds)) = do
@@ -213,6 +219,10 @@ replaceInExpr (Ann ann (UApp fun args)) = do
       updFn <- replaceInExpr fun
       updArgs <- replaceInExpr args
       pure $ Ann ann (UApp updFn updArgs)
+replaceInExpr (Ann ann (ULamCase (AnnListG a2 alts))) = do
+  updAlts <- mapM replaceInAlt alts
+  pure $ Ann ann (ULamCase (AnnListG a2 updAlts))
+
 replaceInExpr (Ann ann (UInfixApp left op right)) = do
   -- print ("reached[UInfixApp]")
   -- print (Ann ann (UInfixApp left op right))
